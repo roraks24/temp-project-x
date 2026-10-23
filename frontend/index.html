@@ -69,11 +69,19 @@
                             </svg>
                             Memory
                         </a>
+                        <a class="nav-item" id="navAgentBtn" href="#" title="Agent Co Workspace">
+                            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                                <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+                                <line x1="8" y1="21" x2="16" y2="21"></line>
+                                <line x1="12" y1="17" x2="12" y2="21"></line>
+                            </svg>
+                            Agent Workspace
+                        </a>
                     </nav>
 
                     <!-- Conversations Section -->
                     <div class="sidebar-section-divider"></div>
-                    <div class="sidebar-conversations-section">
+                    <div class="sidebar-conversations-section" id="sidebarConversationsSection">
                         <div class="conversations-header">
                             <span class="conversations-title">Recent Chats</span>
                             <button class="btn-new-chat" id="btnNewChat" title="Start new conversation">
@@ -86,6 +94,25 @@
                         </div>
                         <div class="conversations-list-container" id="convListContainer">
                             <div class="conversations-list" id="convList">
+                                <!-- Populated dynamically via script.js -->
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Agent Projects Section -->
+                    <div class="sidebar-agent-section" id="sidebarAgentSection" style="display: none;">
+                        <div class="conversations-header">
+                            <span class="conversations-title">Projects</span>
+                            <button class="btn-new-chat" id="btnNewProject" title="Create new project">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                                    <line x1="12" y1="5" x2="12" y2="19"></line>
+                                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                                </svg>
+                                <span>New</span>
+                            </button>
+                        </div>
+                        <div class="conversations-list-container" id="projectListContainer">
+                            <div class="conversations-list" id="projectList">
                                 <!-- Populated dynamically via script.js -->
                             </div>
                         </div>
@@ -299,6 +326,168 @@
                         <button class="btn-page" id="btnPrevMemPage" disabled>&larr; Previous</button>
                         <span class="page-indicator" id="memPageIndicator">Page 1 of 1</span>
                         <button class="btn-page" id="btnNextMemPage" disabled>Next &rarr;</button>
+                    </div>
+                </section>
+
+                <!-- Agent Workspace Section (3-Pane Antigravity IDE) -->
+                <section class="agent-workspace-section" id="agentWorkspaceSection" style="display: none;">
+                    <!-- Agent Toolbar -->
+                    <div class="agent-toolbar">
+                        <div class="agent-toolbar-left">
+                            <div class="agent-project-badge">
+                                <span class="project-indicator-dot"></span>
+                                <span class="agent-current-project-name" id="currentProjectName">Select or create a project</span>
+                            </div>
+                            <div class="agent-status-badges" id="agentStatusBadges" style="display: none;">
+                                <span class="agent-badge" id="badgeExecution">EXEC: IDLE</span>
+                                <span class="agent-badge" id="badgeDeliverable">DELIVERABLE: -</span>
+                                <span class="agent-badge" id="badgeVerification">VERIFICATION: -</span>
+                                <span class="agent-badge badge-objective" id="badgeObjective">OBJECTIVE: -</span>
+                            </div>
+                        </div>
+                        <div class="agent-toolbar-right">
+                            <button class="btn-secondary btn-sm" id="btnRefreshWorkspace" title="Refresh files">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <polyline points="23 4 23 10 17 10"></polyline>
+                                    <polyline points="1 20 1 14 7 14"></polyline>
+                                    <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+                                </svg>
+                                <span>Refresh</span>
+                            </button>
+                            <button class="btn-primary btn-sm" id="btnDownloadZip" title="Download workspace as ZIP">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                    <polyline points="7 10 12 15 17 10"></polyline>
+                                    <line x1="12" y1="15" x2="12" y2="3"></line>
+                                </svg>
+                                <span>Download ZIP</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Objective Prompt Bar -->
+                    <div class="agent-objective-bar">
+                        <div class="objective-input-container">
+                            <textarea id="agentObjectiveInput" placeholder="Enter objective (e.g. 'Compare LangGraph, CrewAI, AutoGen with source citations', or 'Analyze revenue CSV data', or 'Build a Flask REST API')..." rows="2"></textarea>
+                            <div class="objective-actions">
+                                <select id="agentTaskTypeSelect" class="agent-task-select" title="Task Type">
+                                    <option value="general">Auto-Detect</option>
+                                    <option value="research">Research & Citations</option>
+                                    <option value="data_analysis">Data Analysis</option>
+                                    <option value="software">Software Generation</option>
+                                </select>
+                                <button class="btn-primary btn-run" id="btnRunAgent" title="Run Objective">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                                        <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                                    </svg>
+                                    <span id="runBtnText">Run Objective</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 3-Pane IDE Container -->
+                    <div class="agent-panes-layout">
+                        <!-- Left Pane: File Tree -->
+                        <div class="agent-pane pane-files">
+                            <div class="pane-header">
+                                <div class="pane-header-title">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
+                                    <span>Workspace</span>
+                                </div>
+                                <button class="pane-icon-btn" id="btnNewFile" title="New File">+</button>
+                            </div>
+                            <div class="file-tree-container" id="agentFileTree">
+                                <div class="empty-tree-message">No files yet. Run an objective or create a file.</div>
+                            </div>
+                        </div>
+
+                        <!-- Center Pane: Tabbed Editor & Artifact Viewer -->
+                        <div class="agent-pane pane-editor">
+                            <div class="pane-header editor-header">
+                                <div class="editor-tabs" id="editorTabs">
+                                    <div class="editor-tab active" id="activeFileTab">
+                                        <span class="tab-filename" id="activeFileName">Welcome.md</span>
+                                        <span class="tab-dirty-indicator" id="fileDirtyIndicator" style="display:none;">*</span>
+                                    </div>
+                                </div>
+                                <div class="editor-actions">
+                                    <button class="btn-xs btn-secondary" id="btnTogglePreview" title="Toggle Preview">Preview</button>
+                                    <button class="btn-xs btn-primary" id="btnSaveFile" title="Save File (Ctrl+S)">Save</button>
+                                </div>
+                            </div>
+                            <div class="editor-content-area">
+                                <textarea class="code-editor-textarea" id="agentCodeEditor" spellcheck="false" placeholder="Select a file from the workspace tree to view or edit..."></textarea>
+                                <div class="artifact-preview-pane" id="artifactPreviewPane" style="display: none;"></div>
+                            </div>
+                            <div class="editor-footer">
+                                <span id="editorStatusText">UTF-8</span>
+                                <span id="editorCursorPosition">Ln 1, Col 1</span>
+                            </div>
+                        </div>
+
+                        <!-- Right Pane: Agent Control Panel -->
+                        <div class="agent-pane pane-control">
+                            <div class="control-panel-tabs">
+                                <button class="control-tab-btn active" data-tab="graph" id="tabBtnGraph">Graph & Logs</button>
+                                <button class="control-tab-btn" data-tab="audit" id="tabBtnAudit">Audit Trail</button>
+                                <button class="control-tab-btn" data-tab="prompts" id="tabBtnPrompts">Prompts</button>
+                            </div>
+
+                            <!-- Tab 1: Graph & Logs -->
+                            <div class="control-tab-content active" id="controlTabGraph">
+                                <div class="execution-pipeline-nodes">
+                                    <div class="pipeline-node" id="nodePlanner">
+                                        <div class="node-indicator"></div>
+                                        <span class="node-name">Planner</span>
+                                        <span class="node-status" id="statusPlanner">idle</span>
+                                    </div>
+                                    <div class="pipeline-arrow">&rarr;</div>
+                                    <div class="pipeline-node" id="nodeArchitect">
+                                        <div class="node-indicator"></div>
+                                        <span class="node-name">Architect</span>
+                                        <span class="node-status" id="statusArchitect">idle</span>
+                                    </div>
+                                    <div class="pipeline-arrow">&rarr;</div>
+                                    <div class="pipeline-node" id="nodeCoder">
+                                        <div class="node-indicator"></div>
+                                        <span class="node-name">Coder</span>
+                                        <span class="node-status" id="statusCoder">idle</span>
+                                    </div>
+                                </div>
+                                <div class="streaming-logs-header">
+                                    <span>Real-Time Logs</span>
+                                    <button class="pane-icon-btn" id="btnClearLogs" title="Clear logs">&times;</button>
+                                </div>
+                                <div class="streaming-logs-console" id="streamingLogsConsole">
+                                    <div class="log-line log-system">Workspace initialized. Ready to execute objectives.</div>
+                                </div>
+                            </div>
+
+                            <!-- Tab 2: Audit Trail -->
+                            <div class="control-tab-content" id="controlTabAudit" style="display: none;">
+                                <div class="audit-summary-bar" id="auditSummaryBar">
+                                    <span id="auditActionsCount">0 actions executed</span>
+                                </div>
+                                <div class="audit-trail-list" id="auditTrailList">
+                                    <div class="audit-empty-state">No execution records yet. Run an objective to see deterministic action trails, tool calls, and citations.</div>
+                                </div>
+                            </div>
+
+                            <!-- Tab 3: Prompts -->
+                            <div class="control-tab-content" id="controlTabPrompts" style="display: none;">
+                                <div class="prompts-viewer">
+                                    <div class="prompt-viewer-group">
+                                        <label>Planner System Prompt</label>
+                                        <pre class="prompt-viewer-pre" id="promptPlannerViewer">Universal goal decomposition & action-oriented planning.</pre>
+                                    </div>
+                                    <div class="prompt-viewer-group">
+                                        <label>Evidence & Factual Synthesis Prompt</label>
+                                        <pre class="prompt-viewer-pre" id="promptSynthesisViewer">Enforces real Markdown source citations, zero unresolved templates, deterministic metrics.</pre>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </section>
 
@@ -600,6 +789,52 @@
                     Already have an account? <a href="#" id="switchToLoginLink">Sign in instead</a>
                 </div>
             </form>
+        </div>
+    </div>
+
+    <!-- New Project Modal -->
+    <div class="modal-backdrop" id="newProjectModal" style="display: none;">
+        <div class="modal-dialog">
+            <div class="modal-header">
+                <h3 class="modal-title">Create New Project</h3>
+                <button class="modal-close" id="newProjectCloseBtn" title="Close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="projectNameInput">Project Name</label>
+                    <input type="text" class="text-input" id="projectNameInput" placeholder="e.g. Research Benchmark, Data Pipeline, Weather App" maxlength="100" autocomplete="off">
+                </div>
+                <div class="form-group">
+                    <label for="projectDescInput">Description (Optional)</label>
+                    <textarea class="text-input" id="projectDescInput" rows="2" placeholder="Brief description of the project objective" maxlength="500"></textarea>
+                </div>
+                <div class="form-error" id="newProjectError" style="display: none;"></div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" id="newProjectCancelBtn">Cancel</button>
+                <button class="btn-primary" id="newProjectSubmitBtn">Create Project</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- New File Modal -->
+    <div class="modal-backdrop" id="newFileModal" style="display: none;">
+        <div class="modal-dialog">
+            <div class="modal-header">
+                <h3 class="modal-title">Create New Workspace File</h3>
+                <button class="modal-close" id="newFileCloseBtn" title="Close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="newFileNameInput">File Path</label>
+                    <input type="text" class="text-input" id="newFileNameInput" placeholder="e.g. report.md, app.py, data/metrics.csv" maxlength="200" autocomplete="off">
+                </div>
+                <div class="form-error" id="newFileError" style="display: none;"></div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" id="newFileCancelBtn">Cancel</button>
+                <button class="btn-primary" id="newFileSubmitBtn">Create File</button>
+            </div>
         </div>
     </div>
 

@@ -5,3 +5,8 @@ from backend.models.db.conversation import Conversation
 from backend.models.db.message import Message
 from backend.models.db.memory import Memory
 from backend.models.db.ingestion_job import IngestionJob
+from backend.models.db.project import Project
+from backend.models.db.workspace import Workspace
+from backend.models.db.agent_run import AgentRun
+from backend.models.db.execution_action import ExecutionAction
+from backend.models.db.workspace_artifact import WorkspaceArtifact

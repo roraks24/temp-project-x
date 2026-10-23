@@ -98,6 +98,10 @@ if not GROQ_API_KEY:
         "Generation features will be unavailable."
     )
 
+# Agent Workspace & Search Configuration
+TAVILY_API_KEY = os.getenv("TAVILY_API_KEY", "").strip()
+WORKSPACES_DIR = Path(os.getenv("WORKSPACES_DIR", str(BASE_DIR / "workspaces"))).resolve()
+
 # Database
 DATABASE_URL = os.getenv("DATABASE_URL", "").strip()
 if not DATABASE_URL:

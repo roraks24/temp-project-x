@@ -77,6 +77,15 @@ documents/*
 !documents/README.md
 
 # ==========================================
+# Database & Agent Workspaces
+# ==========================================
+*.db
+*.sqlite
+*.sqlite3
+workspaces/*
+!workspaces/.gitkeep
+
+# ==========================================
 # Firebase / Deploy Artifacts
 # ==========================================
 .firebase/

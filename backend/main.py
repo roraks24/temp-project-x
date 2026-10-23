@@ -14,6 +14,7 @@ from backend import __version__
 from backend.core.config import LOG_LEVEL
 from backend.core.logging import setup_logging
 from backend.routes import (
+    agent_workspace,
     auth,
     chat,
     conversations,
@@ -272,3 +273,4 @@ app.include_router(chat.router)
 app.include_router(documents.router)
 app.include_router(conversations.router)
 app.include_router(memories.router)
+app.include_router(agent_workspace.router)

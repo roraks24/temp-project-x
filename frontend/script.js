@@ -222,6 +222,83 @@
     var sidebarLogoutBtn = document.getElementById("sidebarLogoutBtn");
     var sidebarSignInBtn = document.getElementById("sidebarSignInBtn");
 
+    // ── Agent Workspace DOM & State ──
+    var navAgentBtn = document.getElementById("navAgentBtn");
+    var sidebarConversationsSection = document.getElementById("sidebarConversationsSection");
+    var sidebarAgentSection = document.getElementById("sidebarAgentSection");
+    var btnNewProject = document.getElementById("btnNewProject");
+    var projectListContainer = document.getElementById("projectListContainer");
+    var projectList = document.getElementById("projectList");
+
+    var agentWorkspaceSection = document.getElementById("agentWorkspaceSection");
+    var currentProjectName = document.getElementById("currentProjectName");
+    var agentStatusBadges = document.getElementById("agentStatusBadges");
+    var badgeExecution = document.getElementById("badgeExecution");
+    var badgeDeliverable = document.getElementById("badgeDeliverable");
+    var badgeVerification = document.getElementById("badgeVerification");
+    var badgeObjective = document.getElementById("badgeObjective");
+    var btnRefreshWorkspace = document.getElementById("btnRefreshWorkspace");
+    var btnDownloadZip = document.getElementById("btnDownloadZip");
+
+    var agentObjectiveInput = document.getElementById("agentObjectiveInput");
+    var agentTaskTypeSelect = document.getElementById("agentTaskTypeSelect");
+    var btnRunAgent = document.getElementById("btnRunAgent");
+    var runBtnText = document.getElementById("runBtnText");
+
+    var agentFileTree = document.getElementById("agentFileTree");
+    var btnNewFile = document.getElementById("btnNewFile");
+    var activeFileName = document.getElementById("activeFileName");
+    var fileDirtyIndicator = document.getElementById("fileDirtyIndicator");
+    var btnTogglePreview = document.getElementById("btnTogglePreview");
+    var btnSaveFile = document.getElementById("btnSaveFile");
+    var agentCodeEditor = document.getElementById("agentCodeEditor");
+    var artifactPreviewPane = document.getElementById("artifactPreviewPane");
+    var editorStatusText = document.getElementById("editorStatusText");
+    var editorCursorPosition = document.getElementById("editorCursorPosition");
+
+    var tabBtnGraph = document.getElementById("tabBtnGraph");
+    var tabBtnAudit = document.getElementById("tabBtnAudit");
+    var tabBtnPrompts = document.getElementById("tabBtnPrompts");
+    var controlTabGraph = document.getElementById("controlTabGraph");
+    var controlTabAudit = document.getElementById("controlTabAudit");
+    var controlTabPrompts = document.getElementById("controlTabPrompts");
+
+    var nodePlanner = document.getElementById("nodePlanner");
+    var nodeArchitect = document.getElementById("nodeArchitect");
+    var nodeCoder = document.getElementById("nodeCoder");
+    var statusPlanner = document.getElementById("statusPlanner");
+    var statusArchitect = document.getElementById("statusArchitect");
+    var statusCoder = document.getElementById("statusCoder");
+
+    var streamingLogsConsole = document.getElementById("streamingLogsConsole");
+    var btnClearLogs = document.getElementById("btnClearLogs");
+    var auditActionsCount = document.getElementById("auditActionsCount");
+    var auditTrailList = document.getElementById("auditTrailList");
+
+    var newProjectModal = document.getElementById("newProjectModal");
+    var projectNameInput = document.getElementById("projectNameInput");
+    var projectDescInput = document.getElementById("projectDescInput");
+    var newProjectError = document.getElementById("newProjectError");
+    var newProjectCloseBtn = document.getElementById("newProjectCloseBtn");
+    var newProjectCancelBtn = document.getElementById("newProjectCancelBtn");
+    var newProjectSubmitBtn = document.getElementById("newProjectSubmitBtn");
+
+    var newFileModal = document.getElementById("newFileModal");
+    var newFileNameInput = document.getElementById("newFileNameInput");
+    var newFileError = document.getElementById("newFileError");
+    var newFileCloseBtn = document.getElementById("newFileCloseBtn");
+    var newFileCancelBtn = document.getElementById("newFileCancelBtn");
+    var newFileSubmitBtn = document.getElementById("newFileSubmitBtn");
+
+    var agentProjects = [];
+    var currentProject = null;
+    var currentWorkspaceTree = [];
+    var activeFilePath = null;
+    var fileContentCache = {};
+    var fileIsDirty = false;
+    var isPreviewActive = false;
+    var agentIsRunning = false;
+
     // ── SVG Templates ──
     var COPY_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
     var CHECK_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
@@ -773,6 +850,94 @@
                 closeSidebar();
             });
         }
+        if (navAgentBtn) {
+            navAgentBtn.addEventListener("click", function (e) {
+                e.preventDefault();
+                switchView("agent");
+                closeSidebar();
+            });
+        }
+        if (btnNewProject) {
+            btnNewProject.addEventListener("click", function () {
+                openNewProjectModal();
+            });
+        }
+        if (newProjectCloseBtn) newProjectCloseBtn.addEventListener("click", closeNewProjectModal);
+        if (newProjectCancelBtn) newProjectCancelBtn.addEventListener("click", closeNewProjectModal);
+        if (newProjectSubmitBtn) newProjectSubmitBtn.addEventListener("click", submitNewProject);
+
+        if (btnRefreshWorkspace) {
+            btnRefreshWorkspace.addEventListener("click", function () {
+                loadWorkspaceTree();
+            });
+        }
+        if (btnDownloadZip) {
+            btnDownloadZip.addEventListener("click", function () {
+                downloadWorkspaceZip();
+            });
+        }
+        if (btnRunAgent) {
+            btnRunAgent.addEventListener("click", function () {
+                runAgentObjective();
+            });
+        }
+        if (btnNewFile) {
+            btnNewFile.addEventListener("click", function () {
+                openNewFileModal();
+            });
+        }
+        if (newFileCloseBtn) newFileCloseBtn.addEventListener("click", closeNewFileModal);
+        if (newFileCancelBtn) newFileCancelBtn.addEventListener("click", closeNewFileModal);
+        if (newFileSubmitBtn) newFileSubmitBtn.addEventListener("click", submitNewFile);
+
+        if (btnSaveFile) {
+            btnSaveFile.addEventListener("click", function () {
+                saveCurrentFile();
+            });
+        }
+        if (btnTogglePreview) {
+            btnTogglePreview.addEventListener("click", function () {
+                toggleFilePreview();
+            });
+        }
+        if (btnClearLogs) {
+            btnClearLogs.addEventListener("click", function () {
+                clearStreamingLogs();
+            });
+        }
+
+        if (tabBtnGraph) {
+            tabBtnGraph.addEventListener("click", function () {
+                switchControlTab("graph");
+            });
+        }
+        if (tabBtnAudit) {
+            tabBtnAudit.addEventListener("click", function () {
+                switchControlTab("audit");
+            });
+        }
+        if (tabBtnPrompts) {
+            tabBtnPrompts.addEventListener("click", function () {
+                switchControlTab("prompts");
+            });
+        }
+
+        if (agentCodeEditor) {
+            agentCodeEditor.addEventListener("input", function () {
+                if (!fileIsDirty && activeFilePath) {
+                    fileIsDirty = true;
+                    if (fileDirtyIndicator) fileDirtyIndicator.style.display = "inline";
+                }
+            });
+            agentCodeEditor.addEventListener("keydown", function (e) {
+                if ((e.ctrlKey || e.metaKey) && e.key === "s") {
+                    e.preventDefault();
+                    saveCurrentFile();
+                }
+            });
+            agentCodeEditor.addEventListener("keyup", updateEditorCursor);
+            agentCodeEditor.addEventListener("click", updateEditorCursor);
+        }
 
         // Conversations events
         if (btnNewChat) {
@@ -1048,6 +1213,11 @@
             if (navChatBtn) navChatBtn.classList.add("active");
             if (navDocsBtn) navDocsBtn.classList.remove("active");
             if (navMemoryBtn) navMemoryBtn.classList.remove("active");
+            if (navAgentBtn) navAgentBtn.classList.remove("active");
+
+            if (sidebarConversationsSection) sidebarConversationsSection.style.display = "";
+            if (sidebarAgentSection) sidebarAgentSection.style.display = "none";
+            if (agentWorkspaceSection) agentWorkspaceSection.style.display = "none";
 
             if (docsSection) docsSection.style.display = "none";
             if (memorySection) memorySection.style.display = "none";
@@ -1077,6 +1247,11 @@
             if (navMemoryBtn) navMemoryBtn.classList.add("active");
             if (navChatBtn) navChatBtn.classList.remove("active");
             if (navDocsBtn) navDocsBtn.classList.remove("active");
+            if (navAgentBtn) navAgentBtn.classList.remove("active");
+
+            if (sidebarConversationsSection) sidebarConversationsSection.style.display = "";
+            if (sidebarAgentSection) sidebarAgentSection.style.display = "none";
+            if (agentWorkspaceSection) agentWorkspaceSection.style.display = "none";
 
             toggleChatFilesDrawer(false);
             if (chatCornerBar) chatCornerBar.style.display = "none";
@@ -1089,6 +1264,28 @@
             if (docsSection) docsSection.style.display = "none";
             if (memorySection) memorySection.style.display = "flex";
             loadMemories(memoryLibrary.page);
+        } else if (view === "agent") {
+            if (navAgentBtn) navAgentBtn.classList.add("active");
+            if (navChatBtn) navChatBtn.classList.remove("active");
+            if (navDocsBtn) navDocsBtn.classList.remove("active");
+            if (navMemoryBtn) navMemoryBtn.classList.remove("active");
+
+            if (sidebarConversationsSection) sidebarConversationsSection.style.display = "none";
+            if (sidebarAgentSection) sidebarAgentSection.style.display = "block";
+
+            toggleChatFilesDrawer(false);
+            if (chatCornerBar) chatCornerBar.style.display = "none";
+
+            if (mainArea) mainArea.classList.remove("is-empty");
+            if (emptyState) emptyState.style.display = "none";
+            if (chatMessages) chatMessages.style.display = "none";
+            if (inputArea) inputArea.style.display = "none";
+
+            if (docsSection) docsSection.style.display = "none";
+            if (memorySection) memorySection.style.display = "none";
+
+            if (agentWorkspaceSection) agentWorkspaceSection.style.display = "flex";
+            initAgentWorkspace();
         }
     }
 
@@ -2722,6 +2919,743 @@
         var div = document.createElement("div");
         div.textContent = text;
         return div.innerHTML;
+    }
+
+
+    // ─────────────────────────────────────────────────────────────────────────
+    //  Agent Workspace & 3-Pane IDE Controller
+    // ─────────────────────────────────────────────────────────────────────────
+
+    var auditActionRecords = [];
+
+    function initAgentWorkspace() {
+        loadProjects();
+    }
+
+    function loadProjects() {
+        return apiFetch(API_BASE + "/api/agent/projects")
+            .then(function (res) {
+                if (!res.ok) throw new Error("Failed to load projects (" + res.status + ")");
+                return res.json();
+            })
+            .then(function (projects) {
+                agentProjects = (projects && projects.projects) ? projects.projects : (projects || []);
+                if (agentProjects.length === 0) {
+                    return createDefaultProject();
+                } else {
+                    renderProjectsList();
+                    var savedId = localStorage.getItem("rorak_agent_project_id");
+                    var match = agentProjects.find(function (p) { return p.id === savedId; });
+                    selectProject(match || agentProjects[0]);
+                }
+            })
+            .catch(function (err) {
+                console.error("loadProjects error:", err);
+            });
+    }
+
+    function createDefaultProject() {
+        return apiFetch(API_BASE + "/api/agent/projects", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                name: "Agent Co Project",
+                description: "Integrated cloud development and research workspace"
+            })
+        })
+            .then(function (res) { return res.json(); })
+            .then(function (proj) {
+                agentProjects = [proj];
+                renderProjectsList();
+                selectProject(proj);
+            });
+    }
+
+    function renderProjectsList() {
+        if (!projectList) return;
+        projectList.innerHTML = "";
+        agentProjects.forEach(function (proj) {
+            var item = document.createElement("div");
+            item.className = "conv-item" + (currentProject && currentProject.id === proj.id ? " active" : "");
+            item.dataset.id = proj.id;
+
+            var titleSpan = document.createElement("span");
+            titleSpan.className = "conv-title";
+            titleSpan.textContent = proj.name || "Untitled Project";
+            titleSpan.title = proj.description || proj.name;
+
+            var actionsDiv = document.createElement("div");
+            actionsDiv.className = "conv-actions";
+
+            var delBtn = document.createElement("button");
+            delBtn.className = "conv-action-btn btn-delete";
+            delBtn.title = "Delete Project";
+            delBtn.innerHTML = TRASH_ICON;
+            delBtn.addEventListener("click", function (e) {
+                e.stopPropagation();
+                if (confirm("Delete project '" + proj.name + "' and its workspace?")) {
+                    deleteProject(proj.id);
+                }
+            });
+
+            actionsDiv.appendChild(delBtn);
+            item.appendChild(titleSpan);
+            item.appendChild(actionsDiv);
+
+            item.addEventListener("click", function () {
+                selectProject(proj);
+                closeSidebar();
+            });
+
+            projectList.appendChild(item);
+        });
+    }
+
+    function selectProject(proj) {
+        currentProject = proj;
+        if (proj) {
+            localStorage.setItem("rorak_agent_project_id", proj.id);
+            if (currentProjectName) currentProjectName.textContent = proj.name;
+        }
+        renderProjectsList();
+        loadWorkspaceTree();
+        resetPipelineNodes();
+    }
+
+    function deleteProject(projId) {
+        apiFetch(API_BASE + "/api/agent/projects/" + projId, { method: "DELETE" })
+            .then(function (res) {
+                if (res.ok) {
+                    agentProjects = agentProjects.filter(function (p) { return p.id !== projId; });
+                    if (currentProject && currentProject.id === projId) {
+                        currentProject = agentProjects[0] || null;
+                    }
+                    if (agentProjects.length === 0) {
+                        createDefaultProject();
+                    } else {
+                        renderProjectsList();
+                        if (currentProject) selectProject(currentProject);
+                    }
+                }
+            });
+    }
+
+    // Modal: New Project
+    function openNewProjectModal() {
+        if (projectNameInput) projectNameInput.value = "";
+        if (projectDescInput) projectDescInput.value = "";
+        if (newProjectError) newProjectError.style.display = "none";
+        if (newProjectModal) newProjectModal.style.display = "flex";
+        if (projectNameInput) projectNameInput.focus();
+    }
+
+    function closeNewProjectModal() {
+        if (newProjectModal) newProjectModal.style.display = "none";
+    }
+
+    function submitNewProject() {
+        var name = projectNameInput ? projectNameInput.value.trim() : "";
+        var desc = projectDescInput ? projectDescInput.value.trim() : "";
+        if (!name) {
+            if (newProjectError) {
+                newProjectError.textContent = "Please enter a project name.";
+                newProjectError.style.display = "block";
+            }
+            return;
+        }
+
+        apiFetch(API_BASE + "/api/agent/projects", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ name: name, description: desc })
+        })
+            .then(function (res) {
+                if (!res.ok) throw new Error("Failed to create project");
+                return res.json();
+            })
+            .then(function (proj) {
+                closeNewProjectModal();
+                agentProjects.unshift(proj);
+                renderProjectsList();
+                selectProject(proj);
+            })
+            .catch(function (err) {
+                if (newProjectError) {
+                    newProjectError.textContent = err.message;
+                    newProjectError.style.display = "block";
+                }
+            });
+    }
+
+    // Workspace Tree & Files
+    function loadWorkspaceTree() {
+        if (!currentProject || !currentProject.workspace_id) return;
+        apiFetch(API_BASE + "/api/agent/workspaces/" + currentProject.workspace_id + "/tree")
+            .then(function (res) {
+                if (!res.ok) throw new Error("Failed to load workspace tree");
+                return res.json();
+            })
+            .then(function (tree) {
+                currentWorkspaceTree = (tree && tree.tree) ? tree.tree : (tree || []);
+                renderFileTree(currentWorkspaceTree);
+
+                // Auto-open first file if none open
+                if (!activeFilePath && currentWorkspaceTree.length > 0) {
+                    var firstFile = findFirstFile(currentWorkspaceTree);
+                    if (firstFile) openFileInEditor(firstFile.path);
+                }
+            })
+            .catch(function (err) {
+                console.error("loadWorkspaceTree error:", err);
+            });
+    }
+
+    function findFirstFile(nodes) {
+        for (var i = 0; i < nodes.length; i++) {
+            if (nodes[i].type === "file") return nodes[i];
+            if (nodes[i].children && nodes[i].children.length > 0) {
+                var found = findFirstFile(nodes[i].children);
+                if (found) return found;
+            }
+        }
+        return null;
+    }
+
+    function renderFileTree(nodes) {
+        if (!agentFileTree) return;
+        agentFileTree.innerHTML = "";
+        if (!nodes || nodes.length === 0) {
+            agentFileTree.innerHTML = '<div class="empty-tree-message">No files in workspace.<br>Run an objective or click + to add a file.</div>';
+            return;
+        }
+
+        renderTreeNodes(nodes, agentFileTree, 0);
+    }
+
+    function renderTreeNodes(nodes, parentEl, depth) {
+        nodes.forEach(function (node) {
+            var itemEl = document.createElement("div");
+            itemEl.className = "tree-node" + (activeFilePath === node.path ? " active" : "");
+            itemEl.style.paddingLeft = (depth * 14 + 8) + "px";
+
+            var iconEl = document.createElement("span");
+            iconEl.className = "tree-node-icon";
+
+            if (node.type === "directory") {
+                iconEl.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>';
+            } else {
+                iconEl.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>';
+            }
+
+            var labelEl = document.createElement("span");
+            labelEl.className = "tree-node-label";
+            labelEl.textContent = node.name;
+
+            itemEl.appendChild(iconEl);
+            itemEl.appendChild(labelEl);
+
+            if (node.type === "file") {
+                itemEl.addEventListener("click", function () {
+                    openFileInEditor(node.path);
+                });
+            }
+
+            parentEl.appendChild(itemEl);
+
+            if (node.type === "directory" && node.children && node.children.length > 0) {
+                renderTreeNodes(node.children, parentEl, depth + 1);
+            }
+        });
+    }
+
+    function openFileInEditor(filePath) {
+        if (!currentProject || !currentProject.workspace_id) return;
+        activeFilePath = filePath;
+        if (activeFileName) activeFileName.textContent = filePath.split("/").pop();
+        fileIsDirty = false;
+        if (fileDirtyIndicator) fileDirtyIndicator.style.display = "none";
+
+        apiFetch(API_BASE + "/api/agent/workspaces/" + currentProject.workspace_id + "/files?path=" + encodeURIComponent(filePath))
+            .then(function (res) {
+                if (!res.ok) throw new Error("Could not read file");
+                return res.json();
+            })
+            .then(function (data) {
+                if (agentCodeEditor) {
+                    agentCodeEditor.value = data.content || "";
+                }
+                if (isPreviewActive) {
+                    renderFilePreview();
+                }
+                updateEditorCursor();
+                renderFileTree(currentWorkspaceTree);
+            })
+            .catch(function (err) {
+                console.error("openFileInEditor error:", err);
+            });
+    }
+
+    function saveCurrentFile() {
+        if (!currentProject || !currentProject.workspace_id || !activeFilePath) return;
+        var content = agentCodeEditor ? agentCodeEditor.value : "";
+
+        apiFetch(API_BASE + "/api/agent/workspaces/" + currentProject.workspace_id + "/files", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                path: activeFilePath,
+                content: content
+            })
+        })
+            .then(function (res) {
+                if (!res.ok) throw new Error("Save failed");
+                return res.json();
+            })
+            .then(function () {
+                fileIsDirty = false;
+                if (fileDirtyIndicator) fileDirtyIndicator.style.display = "none";
+                if (isPreviewActive) renderFilePreview();
+                showNotification("File saved successfully.");
+            })
+            .catch(function (err) {
+                alert("Failed to save file: " + err.message);
+            });
+    }
+
+    function toggleFilePreview() {
+        isPreviewActive = !isPreviewActive;
+        if (isPreviewActive) {
+            if (agentCodeEditor) agentCodeEditor.style.display = "none";
+            if (artifactPreviewPane) {
+                artifactPreviewPane.style.display = "block";
+                renderFilePreview();
+            }
+            if (btnTogglePreview) btnTogglePreview.textContent = "Code";
+        } else {
+            if (artifactPreviewPane) artifactPreviewPane.style.display = "none";
+            if (agentCodeEditor) agentCodeEditor.style.display = "block";
+            if (btnTogglePreview) btnTogglePreview.textContent = "Preview";
+        }
+    }
+
+    function renderFilePreview() {
+        if (!artifactPreviewPane || !agentCodeEditor) return;
+        var content = agentCodeEditor.value;
+        var ext = (activeFilePath || "").split(".").pop().toLowerCase();
+
+        if (ext === "md" || ext === "markdown") {
+            if (window.marked && window.DOMPurify) {
+                artifactPreviewPane.innerHTML = window.DOMPurify.sanitize(window.marked.parse(content));
+            } else {
+                artifactPreviewPane.textContent = content;
+            }
+        } else if (ext === "json") {
+            try {
+                var parsed = JSON.parse(content);
+                artifactPreviewPane.innerHTML = "<pre><code>" + escapeHtml(JSON.stringify(parsed, null, 2)) + "</code></pre>";
+            } catch (e) {
+                artifactPreviewPane.innerHTML = "<pre><code>" + escapeHtml(content) + "</code></pre>";
+            }
+        } else if (ext === "csv") {
+            var rows = content.trim().split("\n");
+            var tableHtml = "<table>";
+            rows.forEach(function (row, idx) {
+                var cols = row.split(",");
+                tableHtml += "<tr>";
+                cols.forEach(function (col) {
+                    tableHtml += idx === 0 ? "<th>" + escapeHtml(col.trim()) + "</th>" : "<td>" + escapeHtml(col.trim()) + "</td>";
+                });
+                tableHtml += "</tr>";
+            });
+            tableHtml += "</table>";
+            artifactPreviewPane.innerHTML = tableHtml;
+        } else {
+            artifactPreviewPane.innerHTML = "<pre><code>" + escapeHtml(content) + "</code></pre>";
+        }
+    }
+
+    // Modal: New File
+    function openNewFileModal() {
+        if (newFileNameInput) newFileNameInput.value = "";
+        if (newFileError) newFileError.style.display = "none";
+        if (newFileModal) newFileModal.style.display = "flex";
+        if (newFileNameInput) newFileNameInput.focus();
+    }
+
+    function closeNewFileModal() {
+        if (newFileModal) newFileModal.style.display = "none";
+    }
+
+    function submitNewFile() {
+        var filePath = newFileNameInput ? newFileNameInput.value.trim() : "";
+        if (!filePath) {
+            if (newFileError) {
+                newFileError.textContent = "Please enter a file path.";
+                newFileError.style.display = "block";
+            }
+            return;
+        }
+        if (!currentProject || !currentProject.workspace_id) return;
+
+        apiFetch(API_BASE + "/api/agent/workspaces/" + currentProject.workspace_id + "/files", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                path: filePath,
+                content: "# " + filePath.split("/").pop() + "\n\n"
+            })
+        })
+            .then(function (res) {
+                if (!res.ok) throw new Error("Could not create file");
+                return res.json();
+            })
+            .then(function () {
+                closeNewFileModal();
+                loadWorkspaceTree();
+                openFileInEditor(filePath);
+            })
+            .catch(function (err) {
+                if (newFileError) {
+                    newFileError.textContent = err.message;
+                    newFileError.style.display = "block";
+                }
+            });
+    }
+
+    function downloadWorkspaceZip() {
+        if (!currentProject || !currentProject.workspace_id) return;
+        var url = API_BASE + "/api/agent/workspaces/" + currentProject.workspace_id + "/zip";
+        var token = getAccessToken();
+
+        apiFetch(url)
+            .then(function (res) {
+                if (!res.ok) throw new Error("Failed to download ZIP");
+                return res.blob();
+            })
+            .then(function (blob) {
+                var blobUrl = window.URL.createObjectURL(blob);
+                var a = document.createElement("a");
+                a.href = blobUrl;
+                a.download = (currentProject.name || "workspace").replace(/\s+/g, "_") + ".zip";
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                window.URL.revokeObjectURL(blobUrl);
+            })
+            .catch(function (err) {
+                alert("Download failed: " + err.message);
+            });
+    }
+
+    // Agent Control Panel Tabs & Helpers
+    function switchControlTab(tab) {
+        if (tabBtnGraph) tabBtnGraph.classList.toggle("active", tab === "graph");
+        if (tabBtnAudit) tabBtnAudit.classList.toggle("active", tab === "audit");
+        if (tabBtnPrompts) tabBtnPrompts.classList.toggle("active", tab === "prompts");
+
+        if (controlTabGraph) controlTabGraph.style.display = tab === "graph" ? "flex" : "none";
+        if (controlTabAudit) controlTabAudit.style.display = tab === "audit" ? "flex" : "none";
+        if (controlTabPrompts) controlTabPrompts.style.display = tab === "prompts" ? "flex" : "none";
+    }
+
+    function updateEditorCursor() {
+        if (!agentCodeEditor || !editorCursorPosition) return;
+        var val = agentCodeEditor.value.substring(0, agentCodeEditor.selectionStart);
+        var lines = val.split("\n");
+        var line = lines.length;
+        var col = lines[lines.length - 1].length + 1;
+        editorCursorPosition.textContent = "Ln " + line + ", Col " + col;
+    }
+
+    function resetPipelineNodes() {
+        ["Planner", "Architect", "Coder"].forEach(function (name) {
+            var el = document.getElementById("node" + name);
+            var statusEl = document.getElementById("status" + name);
+            if (el) el.className = "pipeline-node";
+            if (statusEl) statusEl.textContent = "idle";
+        });
+    }
+
+    function setNodeStatus(name, status) {
+        var key = name.charAt(0).toUpperCase() + name.slice(1).toLowerCase();
+        var el = document.getElementById("node" + key);
+        var statusEl = document.getElementById("status" + key);
+        if (el) {
+            el.className = "pipeline-node " + status;
+        }
+        if (statusEl) {
+            statusEl.textContent = status;
+        }
+    }
+
+    function appendStreamingLog(message, level) {
+        if (!streamingLogsConsole) return;
+        level = level || "info";
+        var line = document.createElement("div");
+        line.className = "log-line log-" + level;
+        line.textContent = "[" + new Date().toLocaleTimeString() + "] " + message;
+        streamingLogsConsole.appendChild(line);
+        streamingLogsConsole.scrollTop = streamingLogsConsole.scrollHeight;
+    }
+
+    function clearStreamingLogs() {
+        if (streamingLogsConsole) {
+            streamingLogsConsole.innerHTML = '<div class="log-line log-system">Console cleared. Ready for next execution.</div>';
+        }
+    }
+
+    function addAuditCard(record) {
+        if (!auditTrailList) return;
+        var emptyEl = auditTrailList.querySelector(".audit-empty-state");
+        if (emptyEl) emptyEl.remove();
+
+        auditActionRecords.push(record);
+        if (auditActionsCount) auditActionsCount.textContent = auditActionRecords.length + " action(s) executed";
+
+        var card = document.createElement("div");
+        card.className = "audit-card";
+
+        var header = document.createElement("div");
+        header.className = "audit-card-header";
+
+        var titleDiv = document.createElement("div");
+        titleDiv.className = "audit-card-title";
+        titleDiv.innerHTML = '<span class="audit-step-badge">' + escapeHtml(record.step_id || "step") + '</span><span>' + escapeHtml(record.tool_name || "tool") + '</span>';
+
+        var metaDiv = document.createElement("div");
+        metaDiv.className = "audit-card-meta";
+        var statusClass = record.status === "success" ? "status-success" : "status-error";
+        metaDiv.innerHTML = '<span class="audit-status-tag ' + statusClass + '">' + escapeHtml(record.status || "done") + '</span><span class="audit-duration">' + (record.duration_ms || 0) + 'ms</span>';
+
+        header.appendChild(titleDiv);
+        header.appendChild(metaDiv);
+
+        var body = document.createElement("div");
+        body.className = "audit-card-body";
+        body.style.display = "none";
+
+        // Arguments
+        var argsSec = document.createElement("div");
+        argsSec.className = "audit-section";
+        argsSec.innerHTML = '<label>Input Arguments</label><pre class="audit-pre">' + escapeHtml(JSON.stringify(record.tool_args || {}, null, 2)) + '</pre>';
+        body.appendChild(argsSec);
+
+        // Result
+        var resSec = document.createElement("div");
+        resSec.className = "audit-section";
+        var resPreview = typeof record.tool_result === "object" ? JSON.stringify(record.tool_result, null, 2) : String(record.tool_result || "");
+        resSec.innerHTML = '<label>Tool Result</label><pre class="audit-pre">' + escapeHtml(resPreview) + '</pre>';
+        body.appendChild(resSec);
+
+        // Citations / Evidence
+        if (record.tool_result && typeof record.tool_result === "object" && record.tool_result.evidence_url) {
+            var citSec = document.createElement("div");
+            citSec.className = "audit-section";
+            citSec.innerHTML = '<label>Source Citation</label><a href="' + escapeHtml(record.tool_result.evidence_url) + '" target="_blank" rel="noopener noreferrer" style="color: #60a5fa; font-size: 11px;">' + escapeHtml(record.tool_result.evidence_url) + '</a>';
+            body.appendChild(citSec);
+        }
+
+        header.addEventListener("click", function () {
+            body.style.display = body.style.display === "none" ? "flex" : "none";
+        });
+
+        card.appendChild(header);
+        card.appendChild(body);
+        auditTrailList.appendChild(card);
+    }
+
+    // Execute Objective via Server-Sent Events (SSE)
+    function runAgentObjective() {
+        if (agentIsRunning) return;
+        var objective = agentObjectiveInput ? agentObjectiveInput.value.trim() : "";
+        if (!objective) {
+            alert("Please enter an objective for the agent.");
+            return;
+        }
+        if (!currentProject || !currentProject.workspace_id) {
+            alert("Please select or create a project first.");
+            return;
+        }
+
+        var taskType = agentTaskTypeSelect ? agentTaskTypeSelect.value : "general";
+
+        agentIsRunning = true;
+        if (btnRunAgent) btnRunAgent.disabled = true;
+        if (runBtnText) runBtnText.textContent = "Executing...";
+
+        if (agentStatusBadges) agentStatusBadges.style.display = "flex";
+        if (badgeExecution) {
+            badgeExecution.className = "agent-badge badge-running";
+            badgeExecution.textContent = "EXEC: RUNNING";
+        }
+        if (badgeDeliverable) badgeDeliverable.textContent = "DELIVERABLE: -";
+        if (badgeVerification) badgeVerification.textContent = "VERIFICATION: -";
+        if (badgeObjective) {
+            badgeObjective.className = "agent-badge badge-objective";
+            badgeObjective.textContent = "OBJECTIVE: RUNNING";
+        }
+
+        switchControlTab("graph");
+        resetPipelineNodes();
+        setNodeStatus("planner", "running");
+        appendStreamingLog("Starting workflow execution for objective...", "info");
+
+        auditActionRecords = [];
+        if (auditTrailList) {
+            auditTrailList.innerHTML = '<div class="audit-empty-state">Executing actions...</div>';
+        }
+
+        var payload = {
+            objective: objective,
+            task_type: taskType
+        };
+
+        var url = API_BASE + "/api/agent/workspaces/" + currentProject.workspace_id + "/runs";
+        var token = getAccessToken();
+        var headers = {
+            "Content-Type": "application/json"
+        };
+        if (token) {
+            headers["Authorization"] = "Bearer " + token;
+        }
+
+        fetch(url, {
+            method: "POST",
+            headers: headers,
+            body: JSON.stringify(payload)
+        })
+            .then(function (res) {
+                if (!res.ok) throw new Error("Agent run failed to start (" + res.status + ")");
+                var reader = res.body.getReader();
+                var decoder = new TextDecoder("utf-8");
+                var buffer = "";
+
+                function readNext() {
+                    return reader.read().then(function (result) {
+                        if (result.done) {
+                            onRunStreamFinished();
+                            return;
+                        }
+
+                        buffer += decoder.decode(result.value, { stream: true });
+                        var lines = buffer.split("\r\n\r\n");
+                        buffer = lines.pop(); // keep remainder
+
+                        lines.forEach(function (chunk) {
+                            if (!chunk.trim()) return;
+                            var evtMatch = chunk.match(/^event:\s*([^\r\n]+)/m);
+                            var dataMatch = chunk.match(/^data:\s*([^\r\n]+)/m);
+                            var evtName = evtMatch ? evtMatch[1].trim() : "message";
+                            var data = {};
+                            if (dataMatch) {
+                                try {
+                                    data = JSON.parse(dataMatch[1]);
+                                } catch (e) {
+                                    data = { raw: dataMatch[1] };
+                                }
+                            }
+
+                            processAgentSSEEvent(evtName, data);
+                        });
+
+                        return readNext();
+                    });
+                }
+
+                return readNext();
+            })
+            .catch(function (err) {
+                console.error("SSE stream error:", err);
+                appendStreamingLog("Execution failed: " + err.message, "error");
+                if (badgeExecution) {
+                    badgeExecution.className = "agent-badge badge-error";
+                    badgeExecution.textContent = "EXEC: ERROR";
+                }
+                if (badgeObjective) {
+                    badgeObjective.className = "agent-badge badge-objective badge-error";
+                    badgeObjective.textContent = "OBJECTIVE: FAILED";
+                }
+                onRunStreamFinished();
+            });
+    }
+
+    function processAgentSSEEvent(evtName, data) {
+        if (evtName === "run_started") {
+            appendStreamingLog(data.message || "Run started", "info");
+        } else if (evtName === "on_node_start") {
+            setNodeStatus(data.node || "planner", "running");
+            appendStreamingLog("Running " + data.node + "...", "info");
+        } else if (evtName === "on_action_plan") {
+            setNodeStatus("planner", "done");
+            setNodeStatus("architect", "running");
+            appendStreamingLog("Plan decomposed: " + (data.plan && data.plan.steps ? data.plan.steps.length : 0) + " action steps.", "success");
+        } else if (evtName === "on_tool_end") {
+            setNodeStatus("architect", "running");
+            appendStreamingLog("Tool finished: " + data.tool_name + " (" + data.duration_ms + "ms) [" + data.status + "]", "tool");
+            if (data.execution_record) {
+                addAuditCard(data.execution_record);
+            }
+        } else if (evtName === "on_node_end") {
+            setNodeStatus(data.node || "planner", "done");
+            if (data.node === "architect") {
+                setNodeStatus("coder", "running");
+            }
+            appendStreamingLog(data.message || (data.node + " completed."), "info");
+        } else if (evtName === "on_verification") {
+            setNodeStatus("coder", "done");
+            appendStreamingLog("Factual verification: objective " + data.objective_status, data.objective_status === "SUCCESS" ? "success" : "warn");
+            if (data.verification) {
+                if (badgeDeliverable) badgeDeliverable.textContent = "DELIVERABLE: " + (data.verification.deliverable_status || "-");
+                if (badgeVerification) badgeVerification.textContent = "VERIFICATION: " + (data.verification.source_verification_status || "-");
+            }
+        } else if (evtName === "run_complete") {
+            setNodeStatus("coder", "done");
+            var status = data.objective_status || "SUCCESS";
+            appendStreamingLog("Workflow completed in " + (data.duration_ms || 0) + "ms. Objective " + status, status === "SUCCESS" ? "success" : "warn");
+
+            if (badgeExecution) {
+                badgeExecution.className = "agent-badge badge-success";
+                badgeExecution.textContent = "EXEC: DONE";
+            }
+            if (badgeObjective) {
+                badgeObjective.textContent = "OBJECTIVE: " + status;
+                badgeObjective.className = "agent-badge badge-objective " + (status === "SUCCESS" ? "badge-success" : (status === "PARTIAL_SUCCESS" ? "badge-partial" : "badge-error"));
+            }
+            if (data.verification) {
+                if (badgeDeliverable) badgeDeliverable.textContent = "DELIVERABLE: " + (data.verification.deliverable_status || "-");
+                if (badgeVerification) badgeVerification.textContent = "VERIFICATION: " + (data.verification.source_verification_status || "-");
+            }
+
+            // Refresh tree to show generated files and open primary report
+            loadWorkspaceTree();
+            setTimeout(function () {
+                var candidate = currentWorkspaceTree.find(function (n) {
+                    return n.name.indexOf("comparison") !== -1 || n.name.indexOf("report") !== -1 || n.name.endsWith(".md") || n.name.endsWith(".py");
+                });
+                if (candidate) {
+                    openFileInEditor(candidate.path);
+                    if (candidate.name.endsWith(".md") && !isPreviewActive) {
+                        toggleFilePreview();
+                    }
+                }
+            }, 600);
+        } else if (evtName === "run_error") {
+            appendStreamingLog("Execution error: " + (data.error || data.message), "error");
+            if (badgeExecution) {
+                badgeExecution.className = "agent-badge badge-error";
+                badgeExecution.textContent = "EXEC: ERROR";
+            }
+            if (badgeObjective) {
+                badgeObjective.className = "agent-badge badge-objective badge-error";
+                badgeObjective.textContent = "OBJECTIVE: FAILED";
+            }
+        }
+    }
+
+    function onRunStreamFinished() {
+        agentIsRunning = false;
+        if (btnRunAgent) btnRunAgent.disabled = false;
+        if (runBtnText) runBtnText.textContent = "Run Objective";
     }
 
 

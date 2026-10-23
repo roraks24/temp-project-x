@@ -1,16 +1,26 @@
 from collections.abc import Generator
+import logging
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
 from backend.core.config import DATABASE_URL
 
-if not DATABASE_URL:
-    raise RuntimeError("DATABASE_URL is required")
+logger = logging.getLogger(__name__)
+
+db_url = DATABASE_URL
+if not db_url:
+    logger.warning("DATABASE_URL not set; falling back to local SQLite database (sqlite:///./rorak_dev.db)")
+    db_url = "sqlite:///./rorak_dev.db"
+
+connect_args = {}
+if db_url.startswith("sqlite"):
+    connect_args["check_same_thread"] = False
 
 engine = create_engine(
-    DATABASE_URL,
-    pool_pre_ping=True
+    db_url,
+    connect_args=connect_args,
+    pool_pre_ping=True if not db_url.startswith("sqlite") else False
 )
 
 SessionLocal = sessionmaker(
