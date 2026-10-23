@@ -316,6 +316,7 @@
         setRandomGreeting();
         bindEvents();
         checkHealth();
+        initCustomKeys();
 
         // Restore user profile from storage if available
         var savedUserStr = localStorage.getItem(RORAK_USER_KEY);
@@ -2580,11 +2581,15 @@
         var MAX_RETRIES = 2;
         var RETRY_DELAYS = [1000, 2000];
 
+        var customKeys = getActiveCustomKeys();
         var payload = {
             question: question
         };
         if (convIdAtStart) {
             payload.conversation_id = convIdAtStart;
+        }
+        if (customKeys) {
+            payload.custom_keys = customKeys;
         }
 
         apiFetch(API_BASE + "/chat/", {
@@ -3505,10 +3510,14 @@
             auditTrailList.innerHTML = '<div class="audit-empty-state">Executing actions...</div>';
         }
 
+        var customKeys = getActiveCustomKeys();
         var payload = {
             objective: objective,
             task_type: taskType
         };
+        if (customKeys) {
+            payload.custom_keys = customKeys;
+        }
 
         var url = API_BASE + "/api/agent/workspaces/" + currentProject.workspace_id + "/runs";
         var token = getAccessToken();
@@ -3675,6 +3684,314 @@
         agentIsRunning = false;
         if (btnRunAgent) btnRunAgent.disabled = false;
         if (runBtnText) runBtnText.textContent = "Run Objective";
+    }
+
+    // ==========================================================
+    // Custom API Keys & External Providers Module
+    // ==========================================================
+    var RORAK_CUSTOM_KEYS_STORAGE = "rorak_custom_api_keys";
+    var activeCustomKeyProvider = "default";
+
+    function getCustomKeys() {
+        try {
+            var raw = localStorage.getItem(RORAK_CUSTOM_KEYS_STORAGE);
+            return raw ? JSON.parse(raw) : null;
+        } catch (e) {
+            return null;
+        }
+    }
+
+    function saveCustomKeys(keysObj) {
+        if (!keysObj || keysObj.provider === "default") {
+            localStorage.removeItem(RORAK_CUSTOM_KEYS_STORAGE);
+        } else {
+            localStorage.setItem(RORAK_CUSTOM_KEYS_STORAGE, JSON.stringify(keysObj));
+        }
+        updateCustomKeyUI();
+    }
+
+    function getActiveCustomKeys() {
+        var keys = getCustomKeys();
+        if (!keys || keys.provider === "default") return null;
+        return keys;
+    }
+
+    function updateCustomKeyUI() {
+        var keys = getActiveCustomKeys();
+        var hasActiveCustom = !!keys;
+
+        var sidebarDot = document.getElementById("sidebarKeyStatusDot");
+        var agentDot = document.getElementById("agentKeyStatusDot");
+        if (sidebarDot) sidebarDot.style.display = hasActiveCustom ? "inline-block" : "none";
+        if (agentDot) agentDot.style.display = hasActiveCustom ? "inline-block" : "none";
+
+        var sidebarBtn = document.getElementById("sidebarCustomKeysBtn");
+        var agentBtn = document.getElementById("btnAgentCustomKeys");
+        var chatBtn = document.getElementById("btnChatCustomKeys");
+        var provLabel = hasActiveCustom && keys.provider ? keys.provider.toUpperCase() : "DEFAULT";
+
+        if (sidebarBtn) {
+            sidebarBtn.title = hasActiveCustom ? ("Custom Key Active (" + provLabel + ")") : "External APIs & Custom Keys";
+        }
+        if (agentBtn) {
+            agentBtn.title = hasActiveCustom ? ("Custom Key Active (" + provLabel + ")") : "Configure Custom API Keys";
+        }
+        if (chatBtn) {
+            chatBtn.title = hasActiveCustom ? ("Custom Key Active (" + provLabel + ")") : "Configure Custom API Keys";
+        }
+    }
+
+    function showCustomKeysModal() {
+        var modal = document.getElementById("customKeysModal");
+        if (!modal) return;
+        var saved = getCustomKeys();
+        populateCustomKeysForm(saved);
+        selectKeyProviderTab(saved && saved.provider ? saved.provider : "default");
+        hideKeyValidationStatus();
+        fetchServerKeyStatus();
+        modal.style.display = "flex";
+    }
+
+    function hideCustomKeysModal() {
+        var modal = document.getElementById("customKeysModal");
+        if (modal) modal.style.display = "none";
+        hideKeyValidationStatus();
+    }
+
+    function selectKeyProviderTab(provider) {
+        activeCustomKeyProvider = provider || "default";
+
+        var tabs = document.querySelectorAll(".key-provider-tab");
+        tabs.forEach(function (tab) {
+            if (tab.getAttribute("data-provider") === activeCustomKeyProvider) {
+                tab.classList.add("active");
+            } else {
+                tab.classList.remove("active");
+            }
+        });
+
+        var panels = {
+            "default": document.getElementById("panelKeyDefault"),
+            "groq": document.getElementById("panelKeyGroq"),
+            "openai": document.getElementById("panelKeyOpenAI"),
+            "custom": document.getElementById("panelKeyCustom")
+        };
+
+        for (var p in panels) {
+            if (panels[p]) {
+                panels[p].style.display = (p === activeCustomKeyProvider) ? "block" : "none";
+            }
+        }
+        hideKeyValidationStatus();
+    }
+
+    function populateCustomKeysForm(config) {
+        var inputGroqKey = document.getElementById("inputGroqApiKey");
+        var inputGroqModel = document.getElementById("inputGroqModel");
+        var inputOpenAIKey = document.getElementById("inputOpenAIApiKey");
+        var inputOpenAIModel = document.getElementById("inputOpenAIModel");
+        var inputCustomUrl = document.getElementById("inputCustomBaseUrl");
+        var inputCustomKey = document.getElementById("inputCustomApiKey");
+        var inputCustomModel = document.getElementById("inputCustomModelName");
+        var inputTavilyKey = document.getElementById("inputTavilyApiKey");
+
+        if (!config) {
+            if (inputGroqKey) inputGroqKey.value = "";
+            if (inputGroqModel) inputGroqModel.value = "llama-3.3-70b-versatile";
+            if (inputOpenAIKey) inputOpenAIKey.value = "";
+            if (inputOpenAIModel) inputOpenAIModel.value = "gpt-4o-mini";
+            if (inputCustomUrl) inputCustomUrl.value = "";
+            if (inputCustomKey) inputCustomKey.value = "";
+            if (inputCustomModel) inputCustomModel.value = "";
+            if (inputTavilyKey) inputTavilyKey.value = "";
+            return;
+        }
+
+        if (inputGroqKey) inputGroqKey.value = config.groq_api_key || (config.provider === "groq" ? config.api_key : "") || "";
+        if (inputGroqModel && config.groq_model) inputGroqModel.value = config.groq_model;
+        if (inputOpenAIKey) inputOpenAIKey.value = config.openai_api_key || (config.provider === "openai" ? config.api_key : "") || "";
+        if (inputOpenAIModel && config.openai_model) inputOpenAIModel.value = config.openai_model;
+        if (inputCustomUrl) inputCustomUrl.value = config.base_url || config.custom_base_url || "";
+        if (inputCustomKey) inputCustomKey.value = config.custom_api_key || (config.provider === "custom" ? config.api_key : "") || "";
+        if (inputCustomModel) inputCustomModel.value = config.model || config.custom_model || "";
+        if (inputTavilyKey) inputTavilyKey.value = config.tavily_api_key || "";
+    }
+
+    function collectCustomKeysFromForm() {
+        var inputGroqKey = document.getElementById("inputGroqApiKey");
+        var inputGroqModel = document.getElementById("inputGroqModel");
+        var inputOpenAIKey = document.getElementById("inputOpenAIApiKey");
+        var inputOpenAIModel = document.getElementById("inputOpenAIModel");
+        var inputCustomUrl = document.getElementById("inputCustomBaseUrl");
+        var inputCustomKey = document.getElementById("inputCustomApiKey");
+        var inputCustomModel = document.getElementById("inputCustomModelName");
+        var inputTavilyKey = document.getElementById("inputTavilyApiKey");
+
+        var config = {
+            provider: activeCustomKeyProvider,
+            tavily_api_key: inputTavilyKey ? inputTavilyKey.value.trim() : ""
+        };
+
+        if (activeCustomKeyProvider === "groq") {
+            config.groq_api_key = inputGroqKey ? inputGroqKey.value.trim() : "";
+            config.api_key = config.groq_api_key;
+            config.groq_model = inputGroqModel ? inputGroqModel.value : "llama-3.3-70b-versatile";
+            config.model = config.groq_model;
+        } else if (activeCustomKeyProvider === "openai") {
+            config.openai_api_key = inputOpenAIKey ? inputOpenAIKey.value.trim() : "";
+            config.api_key = config.openai_api_key;
+            config.openai_model = inputOpenAIModel ? inputOpenAIModel.value : "gpt-4o-mini";
+            config.model = config.openai_model;
+        } else if (activeCustomKeyProvider === "custom") {
+            config.base_url = inputCustomUrl ? inputCustomUrl.value.trim() : "";
+            config.custom_base_url = config.base_url;
+            config.custom_api_key = inputCustomKey ? inputCustomKey.value.trim() : "";
+            config.api_key = config.custom_api_key;
+            config.model = inputCustomModel ? inputCustomModel.value.trim() : "default";
+            config.custom_model = config.model;
+        }
+
+        return config;
+    }
+
+    function showKeyValidationStatus(msg, statusType) {
+        var banner = document.getElementById("customKeysTestResult");
+        if (!banner) return;
+        banner.style.display = "block";
+        banner.className = "key-validation-status status-" + statusType;
+        banner.textContent = msg;
+    }
+
+    function hideKeyValidationStatus() {
+        var banner = document.getElementById("customKeysTestResult");
+        if (banner) {
+            banner.style.display = "none";
+            banner.textContent = "";
+        }
+    }
+
+    function testCustomKeyConnection() {
+        var config = collectCustomKeysFromForm();
+        if (config.provider === "default") {
+            showKeyValidationStatus("Default provider uses server environment credentials. No test needed.", "success");
+            return;
+        }
+
+        var testPayload = {
+            provider: config.provider,
+            api_key: config.api_key || "",
+            base_url: config.base_url || null,
+            model: config.model || null
+        };
+
+        showKeyValidationStatus("Testing connection to " + config.provider.toUpperCase() + " API...", "loading");
+
+        fetch(API_BASE + "/api/settings/validate-key", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(testPayload)
+        })
+            .then(function (res) { return res.json(); })
+            .then(function (data) {
+                if (data.valid) {
+                    showKeyValidationStatus("Success: " + data.message, "success");
+                } else {
+                    showKeyValidationStatus("Connection Error: " + (data.error || data.message), "error");
+                }
+            })
+            .catch(function (err) {
+                showKeyValidationStatus("Validation request failed: " + err.message, "error");
+            });
+    }
+
+    function fetchServerKeyStatus() {
+        var statusEl = document.getElementById("serverConfigStatusText");
+        fetch(API_BASE + "/api/settings/keys-status")
+            .then(function (res) { return res.json(); })
+            .then(function (data) {
+                if (statusEl) {
+                    if (data.server_groq_configured) {
+                        statusEl.textContent = "Server Groq API Key Active (" + (data.default_model || "Configured") + ")";
+                    } else {
+                        statusEl.textContent = "Server key not configured. Please supply a custom key.";
+                    }
+                }
+            })
+            .catch(function () {});
+    }
+
+    function initCustomKeys() {
+        updateCustomKeyUI();
+
+        var sidebarBtn = document.getElementById("sidebarCustomKeysBtn");
+        var agentBtn = document.getElementById("btnAgentCustomKeys");
+        var chatBtn = document.getElementById("btnChatCustomKeys");
+        var modal = document.getElementById("customKeysModal");
+        var closeBtn = document.getElementById("customKeysCloseBtn");
+        var resetBtn = document.getElementById("btnCustomKeysReset");
+        var testBtn = document.getElementById("btnCustomKeysTest");
+        var saveBtn = document.getElementById("btnCustomKeysSave");
+
+        if (sidebarBtn) sidebarBtn.addEventListener("click", showCustomKeysModal);
+        if (agentBtn) agentBtn.addEventListener("click", showCustomKeysModal);
+        if (chatBtn) chatBtn.addEventListener("click", showCustomKeysModal);
+        if (closeBtn) closeBtn.addEventListener("click", hideCustomKeysModal);
+
+        if (modal) {
+            modal.addEventListener("click", function (e) {
+                if (e.target === modal) hideCustomKeysModal();
+            });
+        }
+
+        var tabs = document.querySelectorAll(".key-provider-tab");
+        tabs.forEach(function (tab) {
+            tab.addEventListener("click", function () {
+                var prov = tab.getAttribute("data-provider");
+                selectKeyProviderTab(prov);
+            });
+        });
+
+        var toggles = [
+            { btn: "toggleGroqKeyVisibility", input: "inputGroqApiKey" },
+            { btn: "toggleOpenAIKeyVisibility", input: "inputOpenAIApiKey" },
+            { btn: "toggleCustomKeyVisibility", input: "inputCustomApiKey" },
+            { btn: "toggleTavilyKeyVisibility", input: "inputTavilyApiKey" }
+        ];
+
+        toggles.forEach(function (t) {
+            var b = document.getElementById(t.btn);
+            var inp = document.getElementById(t.input);
+            if (b && inp) {
+                b.addEventListener("click", function () {
+                    togglePasswordVisibility(inp, b);
+                });
+            }
+        });
+
+        if (resetBtn) {
+            resetBtn.addEventListener("click", function () {
+                saveCustomKeys(null);
+                populateCustomKeysForm(null);
+                selectKeyProviderTab("default");
+                showKeyValidationStatus("Reset to default server environment key.", "success");
+                showNotification("Custom API keys cleared. Using default server key.", "info");
+            });
+        }
+
+        if (saveBtn) {
+            saveBtn.addEventListener("click", function () {
+                var config = collectCustomKeysFromForm();
+                saveCustomKeys(config);
+                showNotification("Custom key configuration saved and activated!", "success");
+                hideCustomKeysModal();
+            });
+        }
+
+        if (testBtn) {
+            testBtn.addEventListener("click", function () {
+                testCustomKeyConnection();
+            });
+        }
     }
 
 

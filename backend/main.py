@@ -21,6 +21,7 @@ from backend.routes import (
     documents,
     health,
     memories,
+    settings,
 )
 from backend.rag import vector_store as vector_store_module
 
@@ -274,3 +275,4 @@ app.include_router(documents.router)
 app.include_router(conversations.router)
 app.include_router(memories.router)
 app.include_router(agent_workspace.router)
+app.include_router(settings.router)

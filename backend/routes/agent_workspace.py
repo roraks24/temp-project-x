@@ -63,6 +63,10 @@ class StartRunRequest(BaseModel):
     recursion_limit: int = 50
     mutable_prompt: Optional[str] = None
     prompt_overrides: Optional[dict[str, str]] = None
+    provider: Optional[str] = None
+    api_key: Optional[str] = None
+    base_url: Optional[str] = None
+    custom_keys: Optional[dict[str, Any]] = None
 
 
 class WriteFileRequest(BaseModel):
@@ -413,9 +417,15 @@ async def start_workspace_agent_run(
     workspace = _get_workspace_with_ownership(workspace_id, db, current_user)
     user_id = _resolve_user_id(current_user, db)
 
-    # Initialize LLM
+    # Initialize LLM with optional user custom keys & provider settings
     try:
-        llm = build_chat_model(model=req.model)
+        llm = build_chat_model(
+            model=req.model,
+            api_key=req.api_key,
+            provider=req.provider,
+            base_url=req.base_url,
+            custom_keys=req.custom_keys,
+        )
     except Exception as exc:
         raise HTTPException(status_code=422, detail=str(exc))
 

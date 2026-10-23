@@ -65,6 +65,7 @@ def chat(
                 conversation_id=request.conversation_id,
                 user_content=request.question,
                 user_id=current_user.id,
+                custom_keys=request.custom_keys,
             )
             return ChatResponse(
                 answer=assistant_msg.content,
@@ -82,6 +83,7 @@ def chat(
                 conversation_id=conv.id,
                 user_content=request.question,
                 user_id=current_user.id,
+                custom_keys=request.custom_keys,
             )
             return ChatResponse(
                 answer=assistant_msg.content,
@@ -90,7 +92,7 @@ def chat(
 
         else:
             # Standalone / stateless chat generation
-            answer = chat_func(request.question)
+            answer = chat_func(request.question, custom_keys=request.custom_keys)
             return ChatResponse(answer=answer, conversation_id=None)
 
     except ConversationNotFound as e:

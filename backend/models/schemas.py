@@ -1,6 +1,6 @@
 from datetime import datetime
 from enum import Enum
-from typing import Optional
+from typing import Any, Optional
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
@@ -92,6 +92,10 @@ class ChatRequest(BaseModel):
     user_id: Optional[UUID] = Field(
         default=None,
         description="Optional user ID for scoping and memory",
+    )
+    custom_keys: Optional[dict[str, Any]] = Field(
+        default=None,
+        description="Optional user-provided external API keys and provider configuration",
     )
 
 

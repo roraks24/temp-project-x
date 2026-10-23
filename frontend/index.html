@@ -124,6 +124,13 @@
                         <svg class="tagline-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 16.8l-6.2 4.5 2.4-7.4L2 9.4h7.6z"/></svg>
                         <span>Rorak AI remembers, understands, and helps you achieve more.</span>
                     </div>
+                    <button class="btn-custom-keys" id="sidebarCustomKeysBtn" title="External APIs & Custom Keys">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M21 2l-2 2m-1.5 1.5L16 7l-2-2m-1 5l2 2m-4.5 4.5a5.5 5.5 0 1 1-7.78-7.78 5.5 5.5 0 0 1 7.78 7.78z"></path>
+                        </svg>
+                        <span>Custom Keys</span>
+                        <span class="custom-key-dot" id="sidebarKeyStatusDot" style="display: none;"></span>
+                    </button>
                     <div class="sidebar-footer" id="sidebarFooter">
                         <div class="user-profile-widget" id="userProfileWidget" style="display: none;">
                             <div class="user-avatar" id="sidebarUserAvatar">U</div>
@@ -165,6 +172,12 @@
 
                 <!-- Chat top corner action bar -->
                 <div class="chat-corner-bar" id="chatCornerBar">
+                    <button class="btn-files-in-chat" id="btnChatCustomKeys" title="External APIs & Custom Keys">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M21 2l-2 2m-1.5 1.5L16 7l-2-2m-1 5l2 2m-4.5 4.5a5.5 5.5 0 1 1-7.78-7.78 5.5 5.5 0 0 1 7.78 7.78z"></path>
+                        </svg>
+                        <span>Custom Key</span>
+                    </button>
                     <button class="btn-files-in-chat" id="btnFilesInChat" title="Files in chat" aria-label="Files in chat">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
@@ -346,6 +359,13 @@
                             </div>
                         </div>
                         <div class="agent-toolbar-right">
+                            <button class="btn-secondary btn-sm" id="btnAgentCustomKeys" title="Configure Custom API Keys">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M21 2l-2 2m-1.5 1.5L16 7l-2-2m-1 5l2 2m-4.5 4.5a5.5 5.5 0 1 1-7.78-7.78 5.5 5.5 0 0 1 7.78 7.78z"></path>
+                                </svg>
+                                <span>Custom Key</span>
+                                <span class="custom-key-dot" id="agentKeyStatusDot" style="display: none;"></span>
+                            </button>
                             <button class="btn-secondary btn-sm" id="btnRefreshWorkspace" title="Refresh files">
                                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                     <polyline points="23 4 23 10 17 10"></polyline>
@@ -834,6 +854,136 @@
             <div class="modal-footer">
                 <button class="btn-secondary" id="newFileCancelBtn">Cancel</button>
                 <button class="btn-primary" id="newFileSubmitBtn">Create File</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Custom API Keys & External Providers Modal -->
+    <div class="modal-backdrop" id="customKeysModal" style="display: none;">
+        <div class="modal-dialog custom-keys-dialog">
+            <div class="modal-header">
+                <div class="modal-header-icon-title">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-accent">
+                        <path d="M21 2l-2 2m-1.5 1.5L16 7l-2-2m-1 5l2 2m-4.5 4.5a5.5 5.5 0 1 1-7.78-7.78 5.5 5.5 0 0 1 7.78 7.78z"></path>
+                    </svg>
+                    <h3 class="modal-title">External API & Custom Keys</h3>
+                </div>
+                <button class="modal-close" id="customKeysCloseBtn" title="Close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p class="modal-help">
+                    Connect your own external API keys for LLM responses and autonomous agent execution. Keys are stored locally in your browser and used whenever you prompt Rorak AI.
+                </p>
+
+                <!-- Provider Selector Tabs -->
+                <div class="key-provider-tabs" role="tablist">
+                    <button class="key-provider-tab active" data-provider="default" id="tabKeyDefault" type="button">Default (Server)</button>
+                    <button class="key-provider-tab" data-provider="groq" id="tabKeyGroq" type="button">Groq</button>
+                    <button class="key-provider-tab" data-provider="openai" id="tabKeyOpenAI" type="button">OpenAI</button>
+                    <button class="key-provider-tab" data-provider="custom" id="tabKeyCustom" type="button">Custom / Ollama</button>
+                </div>
+
+                <!-- Provider 1: Default / Server Environment -->
+                <div class="provider-panel" id="panelKeyDefault">
+                    <div class="default-provider-info">
+                        <div class="status-badge-row">
+                            <span class="badge-dot-green"></span>
+                            <strong id="serverConfigStatusText">Using Server Environment Key</strong>
+                        </div>
+                        <p class="text-muted" style="margin-top: 8px; font-size: 13px; line-height: 1.5;">
+                            The application is currently utilizing the server-configured Groq API key and default models. Switch to one of the tabs above to provide and use your own external API key.
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Provider 2: Groq -->
+                <div class="provider-panel" id="panelKeyGroq" style="display: none;">
+                    <div class="form-group">
+                        <label for="inputGroqApiKey">Groq API Key</label>
+                        <div class="input-with-icon">
+                            <input type="password" class="text-input" id="inputGroqApiKey" placeholder="gsk_..." autocomplete="off">
+                            <button type="button" class="btn-toggle-password" id="toggleGroqKeyVisibility" title="Toggle visibility">
+                                <svg class="eye-open" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                            </button>
+                        </div>
+                        <div class="form-hint">Obtain free from <a href="https://console.groq.com/keys" target="_blank" rel="noopener" style="color: var(--accent);">console.groq.com</a></div>
+                    </div>
+                    <div class="form-group">
+                        <label for="inputGroqModel">Groq Model (Optional)</label>
+                        <select class="select-input" id="inputGroqModel">
+                            <option value="openai/gpt-oss-120b" selected>openai/gpt-oss-120b (Recommended)</option>
+                            <option value="openai/gpt-oss-20b">openai/gpt-oss-20b (Fast)</option>
+                            <option value="qwen/qwen3.8-27b">qwen/qwen3.8-27b</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Provider 3: OpenAI -->
+                <div class="provider-panel" id="panelKeyOpenAI" style="display: none;">
+                    <div class="form-group">
+                        <label for="inputOpenAIApiKey">OpenAI API Key</label>
+                        <div class="input-with-icon">
+                            <input type="password" class="text-input" id="inputOpenAIApiKey" placeholder="sk-..." autocomplete="off">
+                            <button type="button" class="btn-toggle-password" id="toggleOpenAIKeyVisibility" title="Toggle visibility">
+                                <svg class="eye-open" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                            </button>
+                        </div>
+                        <div class="form-hint">Obtain from <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener" style="color: var(--accent);">platform.openai.com</a></div>
+                    </div>
+                    <div class="form-group">
+                        <label for="inputOpenAIModel">OpenAI Model</label>
+                        <select class="select-input" id="inputOpenAIModel">
+                            <option value="gpt-4o">gpt-4o (Most Capable)</option>
+                            <option value="gpt-4o-mini" selected>gpt-4o-mini (Fast & Efficient)</option>
+                            <option value="o1-mini">o1-mini (Reasoning)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Provider 4: Custom / OpenAI-Compatible (Ollama, OpenRouter, DeepSeek) -->
+                <div class="provider-panel" id="panelKeyCustom" style="display: none;">
+                    <div class="form-group">
+                        <label for="inputCustomBaseUrl">Base URL</label>
+                        <input type="text" class="text-input" id="inputCustomBaseUrl" placeholder="http://localhost:11434/v1 or https://openrouter.ai/api/v1" autocomplete="off">
+                        <div class="form-hint">Works with local Ollama, vLLM, OpenRouter, DeepSeek, LocalAI, etc.</div>
+                    </div>
+                    <div class="form-group">
+                        <label for="inputCustomApiKey">API Key / Token (if required)</label>
+                        <div class="input-with-icon">
+                            <input type="password" class="text-input" id="inputCustomApiKey" placeholder="sk-or-... or leave empty for Ollama" autocomplete="off">
+                            <button type="button" class="btn-toggle-password" id="toggleCustomKeyVisibility" title="Toggle visibility">
+                                <svg class="eye-open" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="inputCustomModelName">Model Identifier</label>
+                        <input type="text" class="text-input" id="inputCustomModelName" placeholder="e.g. deepseek-r1, llama3, qwen2.5:32b, mistral" autocomplete="off">
+                    </div>
+                </div>
+
+                <!-- Web Search (Tavily) Section -->
+                <div class="key-section-divider"></div>
+                <div class="form-group">
+                    <label for="inputTavilyApiKey">Tavily Web Search API Key (Optional)</label>
+                    <div class="input-with-icon">
+                        <input type="password" class="text-input" id="inputTavilyApiKey" placeholder="tvly-..." autocomplete="off">
+                        <button type="button" class="btn-toggle-password" id="toggleTavilyKeyVisibility" title="Toggle visibility">
+                            <svg class="eye-open" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                        </button>
+                    </div>
+                    <div class="form-hint">Used for live web research citations in Agent Workspace</div>
+                </div>
+
+                <!-- Validation Status Banner -->
+                <div class="key-validation-status" id="customKeysTestResult" style="display: none;"></div>
+            </div>
+            <div class="modal-footer custom-keys-footer">
+                <button class="btn-secondary" id="btnCustomKeysReset" type="button">Reset to Default</button>
+                <div class="footer-right-actions">
+                    <button class="btn-secondary" id="btnCustomKeysTest" type="button">Test Connection</button>
+                    <button class="btn-primary" id="btnCustomKeysSave" type="button">Save & Apply</button>
+                </div>
             </div>
         </div>
     </div>

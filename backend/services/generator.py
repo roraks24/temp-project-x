@@ -23,22 +23,54 @@ else:
     logger.warning("Groq client not initialized (GROQ_API_KEY is missing).")
 
 
-def _call_groq_completion(prompt: str) -> Optional[str]:
-    """Execute chat completion call to Groq API with timeout and retry with backoff."""
-    if client is None:
-        raise RuntimeError("GROQ_API_KEY is not configured.")
-
+def _call_groq_completion(prompt: str, custom_keys: Optional[dict] = None) -> Optional[str]:
+    """Execute chat completion with dynamic support for custom API keys and providers."""
     import groq
+    import openai
+
+    active_client = client
+    selected_model = GROQ_MODEL
+    is_openai_compatible = False
+
+    if isinstance(custom_keys, dict) and any(custom_keys.values()):
+        provider = (custom_keys.get("provider") or "").lower().strip()
+        custom_key = (
+            custom_keys.get(f"{provider}_api_key")
+            or custom_keys.get("api_key")
+            or custom_keys.get("groq_api_key")
+            or custom_keys.get("openai_api_key")
+            or custom_keys.get("custom_api_key")
+        )
+        custom_base_url = custom_keys.get("base_url") or custom_keys.get("custom_base_url")
+        custom_model = custom_keys.get("model") or custom_keys.get("custom_model")
+
+        if provider in ("custom", "openai_compatible", "ollama", "openrouter", "deepseek", "local") or custom_base_url:
+            is_openai_compatible = True
+            active_client = openai.OpenAI(
+                base_url=custom_base_url or "http://localhost:11434/v1",
+                api_key=custom_key or "custom-key",
+            )
+            selected_model = custom_model or "default"
+        elif provider == "openai" or (custom_key and custom_key.startswith("sk-") and not custom_key.startswith("gsk_")):
+            is_openai_compatible = True
+            active_client = openai.OpenAI(api_key=custom_key)
+            selected_model = custom_model or "gpt-4o"
+        elif custom_key:
+            active_client = Groq(api_key=custom_key)
+            selected_model = custom_model or GROQ_MODEL
+
+    if active_client is None:
+        raise RuntimeError("No AI API key configured. Provide a custom API key or set GROQ_API_KEY.")
 
     max_retries = 2
     backoff = 1.0
 
     for attempt in range(max_retries + 1):
         t0 = time.perf_counter()
-        logger.info("Calling Groq API (model: %s, attempt: %d)...", GROQ_MODEL, attempt + 1)
+        logger.info("Calling LLM API (model: %s, attempt: %d)...", selected_model, attempt + 1)
         try:
-            response = client.chat.completions.create(
-                model=GROQ_MODEL,
+            response = active_client.chat.completions.create(
+                model=selected_model,
                 temperature=0.2,
                 timeout=30.0,
                 messages=[
@@ -50,23 +82,22 @@ def _call_groq_completion(prompt: str) -> Optional[str]:
             )
 
             duration_ms = (time.perf_counter() - t0) * 1000
-            logger.info("Groq API call completed in %.2f ms", duration_ms)
+            logger.info("LLM API call completed in %.2f ms", duration_ms)
 
             if not response.choices or not response.choices[0].message:
                 return None
 
             return response.choices[0].message.content
 
-        except (groq.RateLimitError, groq.APITimeoutError, groq.InternalServerError) as e:
-            if attempt < max_retries:
-                logger.warning("Groq transient error (%s). Retrying in %.1fs...", type(e).__name__, backoff)
+        except Exception as e:
+            err_type = type(e).__name__
+            if attempt < max_retries and any(t in err_type.lower() for t in ("rate", "timeout", "server")):
+                logger.warning("LLM transient error (%s). Retrying in %.1fs...", err_type, backoff)
                 time.sleep(backoff)
                 backoff *= 2
             else:
-                logger.error("Groq API failed after %d retries: %s", max_retries, e)
-                raise RuntimeError(f"AI provider temporarily unavailable: {e}")
-        except Exception:
-            raise
+                logger.error("LLM API failed after %d attempts: %s", attempt + 1, e)
+                raise RuntimeError(f"AI provider error: {e}")
 
 
 def chat_func(
@@ -75,6 +106,7 @@ def chat_func(
     memory_context: Optional[list] = None,
     conversation_id: Optional[object] = None,
     user_id: Optional[object] = None,
+    custom_keys: Optional[dict] = None,
     **kwargs,
 ) -> str:
     """
@@ -82,11 +114,11 @@ def chat_func(
     1. Retrieve and rerank document context from vector store (conversation/user-scoped).
     2. Incorporate bounded conversation history and durable memories when provided.
     3. Separate system instructions, memory, history, context, and query.
-    4. Call Groq LLM with retry on empty response.
+    4. Call LLM (using server or user-inputted custom key) with retry on empty response.
     """
-    if not GROQ_API_KEY:
+    if not GROQ_API_KEY and not custom_keys:
         raise RuntimeError(
-            "GROQ_API_KEY is not configured. Chat generation is unavailable."
+            "GROQ_API_KEY is not configured. Please add a custom key or configure GROQ_API_KEY in the backend environment."
         )
 
     t_total_start = time.perf_counter()
@@ -162,13 +194,13 @@ def chat_func(
     # Step 5: LLM Generation with 1 retry on empty response
     answer = None
     try:
-        raw_answer = _call_groq_completion(prompt)
+        raw_answer = _call_groq_completion(prompt, custom_keys=custom_keys)
         if raw_answer and raw_answer.strip():
             answer = raw_answer.strip()
         else:
             logger.warning("LLM returned empty content on first attempt. Retrying once...")
             time.sleep(0.5)
-            retry_raw = _call_groq_completion(prompt)
+            retry_raw = _call_groq_completion(prompt, custom_keys=custom_keys)
             if retry_raw and retry_raw.strip():
                 answer = retry_raw.strip()
                 logger.info("LLM retry succeeded with valid content.")

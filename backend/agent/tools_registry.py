@@ -86,17 +86,19 @@ GLOBAL_TOOL_REGISTRY = ToolRegistry()
 # 1. Web Search Tool
 # ─────────────────────────────────────────────────────────────────────────────
 
-def execute_web_search(query: str, max_results: int = 5) -> dict[str, Any]:
+def execute_web_search(query: str, max_results: int = 5, api_key: Optional[str] = None, **kwargs: Any) -> dict[str, Any]:
     """Execute live web search via Tavily API with DuckDuckGo fallback."""
     clean_query = query.strip()
     if not clean_query:
         raise ValueError("Search query cannot be empty.")
 
+    tavily_key = (api_key or kwargs.get("tavily_api_key") or os.environ.get("TAVILY_API_KEY") or TAVILY_API_KEY or "").strip()
+
     # 1. Try Tavily API if configured
-    if TAVILY_API_KEY:
+    if tavily_key:
         try:
             req_data = json.dumps({
-                "api_key": TAVILY_API_KEY,
+                "api_key": tavily_key,
                 "query": clean_query,
                 "search_depth": "advanced",
                 "include_answer": True,

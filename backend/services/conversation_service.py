@@ -1,5 +1,6 @@
 import logging
 from datetime import datetime, timezone
+from typing import Optional
 from uuid import UUID, uuid4
 
 from sqlalchemy.orm import Session
@@ -360,6 +361,7 @@ class ConversationService:
         history_limit: int | None = None,
         memory_limit: int | None = None,
         auto_extract_memories: bool = True,
+        custom_keys: Optional[dict] = None,
     ) -> tuple[Message, Message]:
         """
         Step 6 & 7 — Stateful Chat Context Assembly & Context Window Policy:
@@ -439,6 +441,7 @@ class ConversationService:
                 memory_context=scoped_memories,
                 conversation_id=conversation.id,
                 user_id=conversation.user_id,
+                custom_keys=custom_keys,
             )
 
             if not answer:
