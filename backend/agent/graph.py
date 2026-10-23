@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import re
 from datetime import datetime, timezone
 from time import perf_counter
@@ -190,6 +191,9 @@ def _planner_agent(
             "- Research tasks: 'get_github_repo_metadata', 'web_search', 'fetch_url_content', 'write_file'.\n"
             "- Data analysis: 'data_analysis_calc', 'write_file'.\n"
             "- Software generation: 'write_file', 'read_file', 'list_files'.\n"
+            "Requirements:\n"
+            "1. For software/web applications (e.g. portfolio website, landing page, app): plan distinct steps to create each needed file (index.html, style.css, script.js, README.md). Ensure files are complete with zero placeholders.\n"
+            "2. For tool_args of 'list_files', use {\"directory\": \".\"}.\n"
             "Produce structured GoalPlan output."
         )
         human_msg = HumanMessage(content=planning_instructions)
@@ -277,6 +281,44 @@ def _planner_agent(
                             title="Write data analysis report and JSON summary",
                             tool_name="write_file",
                             tool_args={"path": "data_analysis_report.md"},
+                        ),
+                    ],
+                )
+            elif any(w in p_lower for w in ("portfolio", "website", "web", "html", "landing page")):
+                goal_plan = GoalPlan(
+                    objective=user_prompt,
+                    task_type="coding",
+                    expected_outcome="Complete, responsive portfolio website files (HTML, CSS, JS)",
+                    steps=[
+                        ActionStep(
+                            id="step-1",
+                            title="Generate responsive index.html with portfolio sections and navigation",
+                            tool_name="write_file",
+                            tool_args={"path": "index.html"},
+                        ),
+                        ActionStep(
+                            id="step-2",
+                            title="Generate modern style.css with responsive styles and design system",
+                            tool_name="write_file",
+                            tool_args={"path": "style.css"},
+                        ),
+                        ActionStep(
+                            id="step-3",
+                            title="Generate script.js with interactive components and smooth navigation",
+                            tool_name="write_file",
+                            tool_args={"path": "script.js"},
+                        ),
+                        ActionStep(
+                            id="step-4",
+                            title="Generate README.md documentation",
+                            tool_name="write_file",
+                            tool_args={"path": "README.md"},
+                        ),
+                        ActionStep(
+                            id="step-5",
+                            title="Verify workspace files",
+                            tool_name="list_files",
+                            tool_args={"directory": "."},
                         ),
                     ],
                 )
@@ -390,61 +432,125 @@ def _coder_agent(
                 path = tool_args.get("path", f"output_{current_step_idx+1}.md")
                 content = tool_args.get("content", "")
 
-                is_unresolved = bool(has_unresolved_placeholders(content))
-                if not content or len(content.strip()) < 10 or is_unresolved:
-                    # Compile evidence cleanly with source URLs (avoiding step-X labels in prompt)
-                    evidence_snippets: list[str] = []
-                    step_to_url: dict[str, str] = {}
-                    for r in execution_records:
-                        if r.status == "success" and r.tool_result:
-                            u = None
-                            if isinstance(r.tool_result, dict):
-                                u = r.tool_result.get("repo_url") or r.tool_result.get("url")
-                                if not u and isinstance(r.tool_result.get("results"), list) and r.tool_result["results"]:
-                                    u = r.tool_result["results"][0].get("url")
-                            if u:
-                                step_to_url[r.step_id.lower()] = u
-                                m_n = re.search(r"\d+", r.step_id)
-                                if m_n:
-                                    step_to_url[m_n.group(0)] = u
+                ext = os.path.splitext(path)[1].lower()
+                is_code_file = ext in (".html", ".htm", ".css", ".js", ".jsx", ".ts", ".tsx", ".py", ".sh", ".json", ".sql")
+                is_software_task = (
+                    goal_plan.task_type in ("coding", "software")
+                    or any(w in goal_plan.objective.lower() for w in ("website", "portfolio", "app", "code", "script", "html", "css", "component", "frontend", "backend"))
+                )
 
-                            evidence_snippets.append(
-                                f"Retrieved Evidence (Tool: {r.tool_name}, Source URL: {u or 'official'}):\n{json.dumps(r.tool_result, indent=2, default=str)}"
-                            )
+                needs_synthesis = False
+                if not content:
+                    needs_synthesis = True
+                elif bool(has_unresolved_placeholders(content)):
+                    needs_synthesis = True
+                elif is_code_file:
+                    stripped_c = content.strip()
+                    if ext == ".css" and (len(stripped_c) < 80 or len(re.findall(r"[^{}]+\{[^{}]+\}", stripped_c)) < 2):
+                        needs_synthesis = True
+                    elif ext in (".html", ".htm") and (len(stripped_c) < 100 or "<body" not in stripped_c.lower()):
+                        needs_synthesis = True
+                    elif ext == ".js" and len(stripped_c) < 30:
+                        needs_synthesis = True
+                    elif re.match(r"^\s*(/\*[\s\S]*?\*/|<!--[\s\S]*?-->|//.*|#.*)\s*$", stripped_c):
+                        needs_synthesis = True
+                elif len(content.strip()) < 10:
+                    needs_synthesis = True
 
-                    evidence_str = "\n\n".join(evidence_snippets)
+                if needs_synthesis:
+                    if is_code_file or (is_software_task and not ext.endswith(".md")):
+                        # Software code generation with sibling file awareness
+                        sibling_files_context = ""
+                        for r in execution_records:
+                            if r.tool_name == "write_file" and r.status == "success":
+                                sib_path = r.tool_args.get("path")
+                                if sib_path and sib_path != path:
+                                    try:
+                                        sib_content = read_text_file(sib_path)
+                                        sibling_files_context += f"\nFile '{sib_path}':\n```\n{sib_content[:2000]}\n```\n"
+                                    except Exception:
+                                        pass
 
-                    synthesis_prompt = (
-                        f"User Objective: {goal_plan.objective}\n"
-                        f"Task: {step.title}\n"
-                        f"Target File: {path}\n\n"
-                        f"Collected Tool Evidence:\n{evidence_str}\n\n"
-                        "Instruction: Write a comprehensive, factual, research-backed Markdown document adhering strictly to these requirements:\n"
-                        "1. Structure: Executive Summary, Clearly Defined Comparison Criteria, Populated Framework Comparison Table, Architecture Deep-Dive, and Limitations / Unverified Claims.\n"
-                        "2. Citations: Every important factual claim MUST link to an actual source URL using standard markdown links: [Official Release](URL) or [GitHub](URL).\n"
-                        "3. CRITICAL: NEVER use synthetic citation tokens or bracket references like 【step-1†source】, 【1†source】, [step-1$source], [^1], or [Source 1]. Use standard Markdown links [Label](URL).\n"
-                        "4. Quantitative Metrics: Report exact numbers only when supported by the evidence above (e.g. GitHub star counts observed with observation date). If unknown, mark as 'Unverified'.\n"
-                        "5. Package Distinctions: For LangGraph, distinguish core framework release (1.2.16) from auxiliary CLI (cli==0.4.38). For AutoGen, state publication year accurately as 2025 (2025-09-30), NOT 2026.\n"
-                        "6. Ensure all comparison table cells are fully populated—no empty cells.\n"
-                        "Output ONLY the complete Markdown document."
-                    )
-                    content_resp = llm.invoke(synthesis_prompt)
-                    raw_content = getattr(content_resp, "content", str(content_resp))
+                        code_prompt = (
+                            f"User Objective: {goal_plan.objective}\n"
+                            f"Task: {step.title}\n"
+                            f"Target File: {path}\n\n"
+                            + (f"Previously generated files in workspace:\n{sibling_files_context}\n" if sibling_files_context else "")
+                            + "Instruction: Write the COMPLETE, fully implemented, production-ready code for this file.\n"
+                            "STRICT REQUIREMENTS:\n"
+                            "1. ZERO PLACEHOLDERS: Absolutely NO placeholder comments (e.g. NEVER output '/* CSS placeholder */', '<!-- TODO -->', '// To be implemented').\n"
+                            "2. If CSS (style.css): Provide a complete, modern responsive stylesheet with CSS custom properties (variables), reset, typography, header/navigation styles, hero section, portfolio project cards, skills section, contact form styling, animations/transitions, and media queries for mobile and tablet responsiveness.\n"
+                            "3. If HTML (index.html): Provide complete, semantic HTML5 structure with <!DOCTYPE html>, <head> with meta tags and stylesheet link, <header> with nav, Hero, About/Bio, Projects showcase, Skills, Contact, <footer>, and <script src=\"script.js\"></script>.\n"
+                            "4. If JavaScript (script.js): Provide working interactive client-side logic (smooth scrolling, active link highlighting, mobile menu toggle, contact form submit event prevention with feedback).\n"
+                            "5. Output ONLY the raw file contents with no explanatory prose. Avoid markdown code block backticks if possible."
+                        )
+                        content_resp = llm.invoke(code_prompt)
+                        raw_content = getattr(content_resp, "content", str(content_resp))
+                        # Strip outer markdown backtick fences if present
+                        cleaned = raw_content.strip()
+                        m_fence = re.match(r"^```(?:[a-zA-Z0-9_\-\+]*)\r?\n([\s\S]*?)\r?\n```\s*$", cleaned)
+                        if m_fence:
+                            content = m_fence.group(1).strip()
+                        else:
+                            blocks = re.findall(r"```(?:[a-zA-Z0-9_\-\+]*)\r?\n([\s\S]*?)\r?\n```", cleaned)
+                            if len(blocks) == 1:
+                                content = blocks[0].strip()
+                            else:
+                                content = cleaned
+                    else:
+                        # Compile evidence cleanly with source URLs (avoiding step-X labels in prompt)
+                        evidence_snippets: list[str] = []
+                        step_to_url: dict[str, str] = {}
+                        for r in execution_records:
+                            if r.status == "success" and r.tool_result:
+                                u = None
+                                if isinstance(r.tool_result, dict):
+                                    u = r.tool_result.get("repo_url") or r.tool_result.get("url")
+                                    if not u and isinstance(r.tool_result.get("results"), list) and r.tool_result["results"]:
+                                        u = r.tool_result["results"][0].get("url")
+                                if u:
+                                    step_to_url[r.step_id.lower()] = u
+                                    m_n = re.search(r"\d+", r.step_id)
+                                    if m_n:
+                                        step_to_url[m_n.group(0)] = u
 
-                    # Post-process: convert any accidental synthetic citations into real Markdown links
-                    def _replace_cite(m: re.Match) -> str:
-                        raw = m.group(0)
-                        num_m = re.search(r"(?:step-)?(\d+)", raw, re.IGNORECASE)
-                        if num_m:
-                            s_key = num_m.group(1)
-                            target_u = step_to_url.get(s_key) or step_to_url.get(f"step-{s_key}")
-                            if target_u:
-                                return f"([Source]({target_u}))"
-                        return ""
+                                evidence_snippets.append(
+                                    f"Retrieved Evidence (Tool: {r.tool_name}, Source URL: {u or 'official'}):\n{json.dumps(r.tool_result, indent=2, default=str)}"
+                                )
 
-                    content = re.sub(r"【[^】]*】", _replace_cite, raw_content)
-                    content = re.sub(r"\[\s*step-\d+[†$]source\s*\]", _replace_cite, content)
-                    content = re.sub(r"\[\s*\d+[†$]source\s*\]", _replace_cite, content)
+                        evidence_str = "\n\n".join(evidence_snippets)
+
+                        synthesis_prompt = (
+                            f"User Objective: {goal_plan.objective}\n"
+                            f"Task: {step.title}\n"
+                            f"Target File: {path}\n\n"
+                            f"Collected Tool Evidence:\n{evidence_str}\n\n"
+                            "Instruction: Write a comprehensive, factual, research-backed Markdown document adhering strictly to these requirements:\n"
+                            "1. Structure: Executive Summary, Clearly Defined Comparison Criteria, Populated Framework Comparison Table, Architecture Deep-Dive, and Limitations / Unverified Claims.\n"
+                            "2. Citations: Every important factual claim MUST link to an actual source URL using standard markdown links: [Official Release](URL) or [GitHub](URL).\n"
+                            "3. CRITICAL: NEVER use synthetic citation tokens or bracket references like 【step-1†source】, 【1†source】, [step-1$source], [^1], or [Source 1]. Use standard Markdown links [Label](URL).\n"
+                            "4. Quantitative Metrics: Report exact numbers only when supported by the evidence above (e.g. GitHub star counts observed with observation date). If unknown, mark as 'Unverified'.\n"
+                            "5. Package Distinctions: For LangGraph, distinguish core framework release (1.2.16) from auxiliary CLI (cli==0.4.38). For AutoGen, state publication year accurately as 2025 (2025-09-30), NOT 2026.\n"
+                            "6. Ensure all comparison table cells are fully populated—no empty cells.\n"
+                            "Output ONLY the complete Markdown document."
+                        )
+                        content_resp = llm.invoke(synthesis_prompt)
+                        raw_content = getattr(content_resp, "content", str(content_resp))
+
+                        # Post-process: convert any accidental synthetic citations into real Markdown links
+                        def _replace_cite(m: re.Match) -> str:
+                            raw = m.group(0)
+                            num_m = re.search(r"(?:step-)?(\d+)", raw, re.IGNORECASE)
+                            if num_m:
+                                s_key = num_m.group(1)
+                                target_u = step_to_url.get(s_key) or step_to_url.get(f"step-{s_key}")
+                                if target_u:
+                                    return f"([Source]({target_u}))"
+                            return ""
+
+                        content = re.sub(r"【[^】]*】", _replace_cite, raw_content)
+                        content = re.sub(r"\[\s*step-\d+[†$]source\s*\]", _replace_cite, content)
+                        content = re.sub(r"\[\s*\d+[†$]source\s*\]", _replace_cite, content)
 
                 result = GLOBAL_TOOL_REGISTRY.execute("write_file", {"path": path, "content": content})
 

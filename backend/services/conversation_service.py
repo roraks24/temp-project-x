@@ -308,6 +308,7 @@ class ConversationService:
             conversation_id=conversation.id,
             role=role_str,
             content=clean_content,
+            created_at=datetime.now(timezone.utc),
         )
 
         try:

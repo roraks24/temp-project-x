@@ -3590,7 +3590,7 @@
             setNodeStatus("architect", "running");
             appendStreamingLog("Plan decomposed: " + (data.plan && data.plan.steps ? data.plan.steps.length : 0) + " action steps.", "success");
         } else if (evtName === "on_tool_end") {
-            setNodeStatus("architect", "running");
+            setNodeStatus("coder", "running");
             appendStreamingLog("Tool finished: " + data.tool_name + " (" + data.duration_ms + "ms) [" + data.status + "]", "tool");
             if (data.execution_record) {
                 addAuditCard(data.execution_record);
@@ -3605,32 +3605,51 @@
             setNodeStatus("coder", "done");
             appendStreamingLog("Factual verification: objective " + data.objective_status, data.objective_status === "SUCCESS" ? "success" : "warn");
             if (data.verification) {
-                if (badgeDeliverable) badgeDeliverable.textContent = "DELIVERABLE: " + (data.verification.deliverable_status || "-");
-                if (badgeVerification) badgeVerification.textContent = "VERIFICATION: " + (data.verification.source_verification_status || "-");
+                if (badgeDeliverable) {
+                    var dStatus = data.verification.deliverable_status || "-";
+                    badgeDeliverable.textContent = "DELIVERABLE: " + dStatus;
+                    badgeDeliverable.className = "agent-badge " + (dStatus === "SUCCESS" ? "badge-success" : (dStatus === "PARTIAL_SUCCESS" ? "badge-partial" : (dStatus === "FAILED" ? "badge-error" : "")));
+                }
+                if (badgeVerification) {
+                    var vStatus = data.verification.source_verification_status || "-";
+                    badgeVerification.textContent = "VERIFICATION: " + vStatus;
+                    badgeVerification.className = "agent-badge " + (vStatus === "SUCCESS" ? "badge-success" : (vStatus === "PARTIAL_SUCCESS" ? "badge-partial" : (vStatus === "FAILED" ? "badge-error" : "")));
+                }
             }
         } else if (evtName === "run_complete") {
+            setNodeStatus("planner", "done");
+            setNodeStatus("architect", "done");
             setNodeStatus("coder", "done");
             var status = data.objective_status || "SUCCESS";
             appendStreamingLog("Workflow completed in " + (data.duration_ms || 0) + "ms. Objective " + status, status === "SUCCESS" ? "success" : "warn");
 
             if (badgeExecution) {
-                badgeExecution.className = "agent-badge badge-success";
-                badgeExecution.textContent = "EXEC: DONE";
+                var execStatus = data.verification && data.verification.execution_status ? data.verification.execution_status : "SUCCESS";
+                badgeExecution.textContent = "EXEC: " + (execStatus === "SUCCESS" ? "DONE" : execStatus);
+                badgeExecution.className = "agent-badge " + (execStatus === "SUCCESS" ? "badge-success" : (execStatus === "PARTIAL_SUCCESS" ? "badge-partial" : "badge-error"));
             }
             if (badgeObjective) {
                 badgeObjective.textContent = "OBJECTIVE: " + status;
                 badgeObjective.className = "agent-badge badge-objective " + (status === "SUCCESS" ? "badge-success" : (status === "PARTIAL_SUCCESS" ? "badge-partial" : "badge-error"));
             }
             if (data.verification) {
-                if (badgeDeliverable) badgeDeliverable.textContent = "DELIVERABLE: " + (data.verification.deliverable_status || "-");
-                if (badgeVerification) badgeVerification.textContent = "VERIFICATION: " + (data.verification.source_verification_status || "-");
+                if (badgeDeliverable) {
+                    var dStatus = data.verification.deliverable_status || "-";
+                    badgeDeliverable.textContent = "DELIVERABLE: " + dStatus;
+                    badgeDeliverable.className = "agent-badge " + (dStatus === "SUCCESS" ? "badge-success" : (dStatus === "PARTIAL_SUCCESS" ? "badge-partial" : (dStatus === "FAILED" ? "badge-error" : "")));
+                }
+                if (badgeVerification) {
+                    var vStatus = data.verification.source_verification_status || "-";
+                    badgeVerification.textContent = "VERIFICATION: " + vStatus;
+                    badgeVerification.className = "agent-badge " + (vStatus === "SUCCESS" ? "badge-success" : (vStatus === "PARTIAL_SUCCESS" ? "badge-partial" : (vStatus === "FAILED" ? "badge-error" : "")));
+                }
             }
 
             // Refresh tree to show generated files and open primary report
             loadWorkspaceTree();
             setTimeout(function () {
                 var candidate = currentWorkspaceTree.find(function (n) {
-                    return n.name.indexOf("comparison") !== -1 || n.name.indexOf("report") !== -1 || n.name.endsWith(".md") || n.name.endsWith(".py");
+                    return n.name === "index.html" || n.name.indexOf("comparison") !== -1 || n.name.indexOf("report") !== -1 || n.name.endsWith(".md") || n.name.endsWith(".py");
                 });
                 if (candidate) {
                     openFileInEditor(candidate.path);

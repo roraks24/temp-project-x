@@ -84,7 +84,7 @@ def _resolve_user_id(current_user: Optional[User], db: Optional[Session] = None)
     """Return user id or ensure a fallback default demo user in database."""
     if current_user and current_user.id:
         return current_user.id if isinstance(current_user.id, UUID) else UUID(str(current_user.id))
-    guest_uuid = UUID("00000000-0000-0000-0000-000000000001")
+    guest_uuid = UUID("a0000000-0000-4000-8000-000000000001")
     if db is not None:
         try:
             guest_user = db.query(User).filter(User.id == guest_uuid).first()
@@ -160,36 +160,36 @@ def create_project(
 ):
     """Create a new project and initialize its dedicated persistent cloud workspace."""
     user_id = _resolve_user_id(current_user, db)
+    proj_id = uuid4()
     proj = Project(
+        id=proj_id,
         name=req.name.strip(),
         description=req.description,
         user_id=user_id,
     )
     db.add(proj)
-    db.flush()
 
     ws_id = uuid4()
     ws_path = str(get_workspace_dir(str(ws_id)))
     workspace = Workspace(
         id=ws_id,
-        project_id=proj.id,
+        project_id=proj_id,
         user_id=user_id,
         storage_path=ws_path,
         status="ready",
     )
     db.add(workspace)
     db.commit()
-    db.refresh(proj)
-    db.refresh(workspace)
 
+    now_iso = datetime.now(timezone.utc).isoformat()
     return {
-        "id": str(proj.id),
-        "name": proj.name,
-        "description": proj.description,
-        "status": proj.status,
-        "workspace_id": str(workspace.id),
-        "created_at": proj.created_at.isoformat(),
-        "updated_at": proj.updated_at.isoformat(),
+        "id": str(proj_id),
+        "name": req.name.strip(),
+        "description": req.description,
+        "status": "active",
+        "workspace_id": str(ws_id),
+        "created_at": now_iso,
+        "updated_at": now_iso,
     }
 
 
@@ -504,8 +504,8 @@ async def start_workspace_agent_run(
                             if not isinstance(update, dict):
                                 continue
 
-                            # 1. Action plan established
-                            if "goal_plan" in update and update["goal_plan"]:
+                            # 1. Action plan established (only once from planner node)
+                            if node == "planner" and "goal_plan" in update and update["goal_plan"]:
                                 gp = update["goal_plan"]
                                 gp_dict = gp.model_dump() if hasattr(gp, "model_dump") else gp
                                 yield _format_sse(

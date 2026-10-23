@@ -55,7 +55,28 @@ class ToolRegistry:
         tool = self.get(name)
         if not tool:
             raise ValueError(f"Tool '{name}' is not registered.")
-        return tool.handler(**args)
+
+        call_args = dict(args or {})
+        # Normalize aliases commonly chosen by LLMs
+        if name in ("read_file", "delete_file", "write_file", "list_files"):
+            if "file_path" in call_args and "path" not in call_args:
+                call_args["path"] = call_args.pop("file_path")
+            if "file" in call_args and "path" not in call_args:
+                call_args["path"] = call_args.pop("file")
+        if name == "list_files":
+            if "path" in call_args and "directory" not in call_args:
+                call_args["directory"] = call_args["path"]
+            elif "dir" in call_args and "directory" not in call_args:
+                call_args["directory"] = call_args["dir"]
+
+        import inspect
+        sig = inspect.signature(tool.handler)
+        has_varkw = any(p.kind == inspect.Parameter.VAR_KEYWORD for p in sig.parameters.values())
+        if has_varkw:
+            return tool.handler(**call_args)
+
+        valid_args = {k: v for k, v in call_args.items() if k in sig.parameters}
+        return tool.handler(**valid_args)
 
 
 GLOBAL_TOOL_REGISTRY = ToolRegistry()
@@ -422,9 +443,10 @@ def execute_data_analysis_calc(
 # 5. Sandboxed Filesystem Tools
 # ─────────────────────────────────────────────────────────────────────────────
 
-def execute_write_file(path: str, content: str) -> dict[str, Any]:
+def execute_write_file(path: str = "", content: str = "", file_path: Optional[str] = None, **kwargs: Any) -> dict[str, Any]:
     """Write text file inside the active workspace."""
-    rel = write_text_file(path, content)
+    target_path = path or file_path or "output.txt"
+    rel = write_text_file(target_path, content)
     return {
         "path": rel,
         "bytes_written": len(content.encode("utf-8")),
@@ -432,20 +454,22 @@ def execute_write_file(path: str, content: str) -> dict[str, Any]:
     }
 
 
-def execute_read_file(path: str) -> dict[str, Any]:
+def execute_read_file(path: str = "", file_path: Optional[str] = None, **kwargs: Any) -> dict[str, Any]:
     """Read text file from the active workspace."""
-    content = read_text_file(path)
+    target_path = path or file_path or ""
+    content = read_text_file(target_path)
     return {
-        "path": path,
+        "path": target_path,
         "total_chars": len(content),
         "content": content[:8000],
     }
 
 
-def execute_list_files(directory: str = ".") -> dict[str, Any]:
+def execute_list_files(directory: Optional[str] = None, path: Optional[str] = None, **kwargs: Any) -> dict[str, Any]:
     """List relative files in active workspace."""
-    files = list_relative_files(directory)
-    return {"directory": directory, "count": len(files), "files": files}
+    target_dir = path or directory or kwargs.get("dir") or "."
+    files = list_relative_files(target_dir)
+    return {"directory": target_dir, "count": len(files), "files": files}
 
 
 def execute_delete_file(path: str) -> dict[str, Any]:
