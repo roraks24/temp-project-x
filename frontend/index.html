@@ -422,7 +422,7 @@
                             </div>
                         </div>
 
-                        <!-- Center Pane: Tabbed Editor & Artifact Viewer -->
+                        <!-- Center Pane: Tabbed Editor & Live Preview -->
                         <div class="agent-pane pane-editor">
                             <div class="pane-header editor-header">
                                 <div class="editor-tabs" id="editorTabs">
@@ -431,14 +431,58 @@
                                         <span class="tab-dirty-indicator" id="fileDirtyIndicator" style="display:none;">*</span>
                                     </div>
                                 </div>
+                                <div class="editor-mode-switcher">
+                                    <button type="button" class="mode-btn active" id="btnModeCode" title="View & Edit Source Code">Code</button>
+                                    <button type="button" class="mode-btn" id="btnModePreview" title="Live Preview Output">Preview</button>
+                                </div>
                                 <div class="editor-actions">
-                                    <button class="btn-xs btn-secondary" id="btnTogglePreview" title="Toggle Preview">Preview</button>
+                                    <button class="btn-xs btn-secondary" id="btnTogglePreview" title="Toggle Preview" style="display:none;">Preview</button>
                                     <button class="btn-xs btn-primary" id="btnSaveFile" title="Save File (Ctrl+S)">Save</button>
                                 </div>
                             </div>
                             <div class="editor-content-area">
                                 <textarea class="code-editor-textarea" id="agentCodeEditor" spellcheck="false" placeholder="Select a file from the workspace tree to view or edit..."></textarea>
-                                <div class="artifact-preview-pane" id="artifactPreviewPane" style="display: none;"></div>
+                                
+                                <div class="workspace-preview-container" id="workspacePreviewContainer" style="display: none;">
+                                    <div class="preview-toolbar" id="previewToolbar">
+                                        <div class="preview-address-bar">
+                                            <span class="preview-status-dot" id="previewStatusDot" title="Live Preview Active"></span>
+                                            <span class="preview-address-text" id="previewAddressText">/index.html</span>
+                                        </div>
+                                        <div class="preview-viewport-controls">
+                                            <button type="button" class="preview-btn active" id="btnViewportDesktop" title="Desktop View (100%)">
+                                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg>
+                                                <span>Desktop</span>
+                                            </button>
+                                            <button type="button" class="preview-btn" id="btnViewportTablet" title="Tablet View (768px)">
+                                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="2" width="16" height="20" rx="2" ry="2"></rect><line x1="12" y1="18" x2="12.01" y2="18"></line></svg>
+                                                <span>Tablet</span>
+                                            </button>
+                                            <button type="button" class="preview-btn" id="btnViewportMobile" title="Mobile View (375px)">
+                                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect><line x1="12" y1="18" x2="12.01" y2="18"></line></svg>
+                                                <span>Mobile</span>
+                                            </button>
+                                        </div>
+                                        <div class="preview-action-controls">
+                                            <button type="button" class="preview-btn icon-only" id="btnRefreshPreview" title="Refresh Live Preview">
+                                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+                                            </button>
+                                            <button type="button" class="preview-btn icon-only" id="btnPopoutPreview" title="Open in New Window / Tab">
+                                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
+                                            </button>
+                                            <button type="button" class="preview-btn icon-only" id="btnExpandPreview" title="Expand / Collapse Preview Pane">
+                                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline><line x1="21" y1="3" x2="14" y2="10"></line><line x1="3" y1="21" x2="10" y2="14"></line></svg>
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div class="preview-viewport-wrapper" id="previewViewportWrapper">
+                                        <div class="preview-viewport-frame desktop" id="previewViewportFrame">
+                                            <iframe id="workspacePreviewIframe" class="preview-iframe" sandbox="allow-scripts allow-forms allow-modals" src="about:blank"></iframe>
+                                            <div class="preview-dimension-badge" id="previewDimensionBadge">Desktop (100%)</div>
+                                        </div>
+                                        <div class="artifact-preview-pane" id="artifactPreviewPane" style="display: none;"></div>
+                                    </div>
+                                </div>
                             </div>
                             <div class="editor-footer">
                                 <span id="editorStatusText">UTF-8</span>

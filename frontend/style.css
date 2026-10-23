@@ -3032,6 +3032,308 @@ html, body {
     background: #191919;
 }
 
+/* ==========================================================
+   Agent Workspace: Live Preview & Viewport Controller
+   ========================================================== */
+
+.editor-mode-switcher {
+    display: inline-flex;
+    align-items: center;
+    background: #141416;
+    border: 1px solid #26262a;
+    border-radius: 6px;
+    padding: 2px;
+    gap: 2px;
+}
+
+.mode-btn {
+    background: transparent;
+    border: none;
+    color: #94a3b8;
+    font-size: 11px;
+    font-weight: 500;
+    padding: 3px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.mode-btn:hover {
+    color: #f8fafc;
+}
+
+.mode-btn.active {
+    background: #2563eb;
+    color: #ffffff;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+.workspace-preview-container {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    background: #09090b;
+    z-index: 10;
+    overflow: hidden;
+}
+
+.preview-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    height: 38px;
+    padding: 4px 12px;
+    background: #111114;
+    border-bottom: 1px solid #1f1f23;
+    flex-shrink: 0;
+}
+
+.preview-address-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: #18181b;
+    border: 1px solid #27272a;
+    border-radius: 6px;
+    padding: 4px 10px;
+    min-width: 140px;
+    max-width: 280px;
+    overflow: hidden;
+    font-size: 11px;
+    font-family: ui-monospace, monospace;
+    color: #d4d4d8;
+}
+
+.preview-status-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: #10b981;
+    box-shadow: 0 0 6px rgba(16, 185, 129, 0.6);
+    flex-shrink: 0;
+}
+
+.preview-status-dot.loading {
+    background: #f59e0b;
+    box-shadow: 0 0 6px rgba(245, 158, 11, 0.6);
+}
+
+.preview-address-text {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.preview-viewport-controls {
+    display: flex;
+    align-items: center;
+    background: #18181b;
+    border: 1px solid #27272a;
+    border-radius: 6px;
+    padding: 2px;
+    gap: 2px;
+}
+
+.preview-action-controls {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.preview-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    background: transparent;
+    border: none;
+    color: #a1a1aa;
+    font-size: 11px;
+    font-weight: 500;
+    padding: 4px 8px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.preview-btn:hover {
+    color: #ffffff;
+    background: rgba(255, 255, 255, 0.06);
+}
+
+.preview-btn.active {
+    background: #27272a;
+    color: #ffffff;
+}
+
+.preview-btn.icon-only {
+    padding: 5px;
+    border: 1px solid transparent;
+}
+
+.preview-btn.icon-only:hover {
+    border-color: #27272a;
+    background: #18181b;
+}
+
+.preview-btn.spinning svg {
+    animation: preview-spin 0.6s linear infinite;
+}
+
+@keyframes preview-spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+.preview-viewport-wrapper {
+    position: relative;
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: auto;
+    background: #09090b;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+}
+
+.preview-viewport-frame {
+    position: relative;
+    height: 100%;
+    width: 100%;
+    transition: width 0.25s ease, height 0.25s ease, box-shadow 0.25s ease;
+    display: flex;
+    flex-direction: column;
+}
+
+.preview-viewport-frame.desktop {
+    width: 100%;
+    height: 100%;
+}
+
+.preview-viewport-frame.tablet {
+    width: 768px;
+    max-width: 95%;
+    height: 94%;
+    margin: auto;
+    border: 2px solid #27272a;
+    border-radius: 12px;
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6);
+    overflow: hidden;
+}
+
+.preview-viewport-frame.mobile {
+    width: 375px;
+    max-width: 95%;
+    height: 667px;
+    max-height: 94%;
+    margin: auto;
+    border: 3px solid #3f3f46;
+    border-radius: 24px;
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.7);
+    overflow: hidden;
+}
+
+.preview-iframe {
+    width: 100%;
+    height: 100%;
+    border: none;
+    background: #ffffff;
+    display: block;
+}
+
+.preview-dimension-badge {
+    position: absolute;
+    bottom: 8px;
+    right: 12px;
+    background: rgba(15, 15, 18, 0.85);
+    backdrop-filter: blur(4px);
+    border: 1px solid #27272a;
+    color: #71717a;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 10px;
+    font-family: ui-monospace, monospace;
+    pointer-events: none;
+}
+
+/* Expanded Preview Mode (Fullscreen within IDE) */
+.agent-workspace-body.preview-expanded .pane-files,
+.agent-workspace-body.preview-expanded .pane-control {
+    display: none !important;
+}
+
+.agent-workspace-body.preview-expanded .pane-editor {
+    flex: 1 1 100% !important;
+    max-width: 100% !important;
+    border-right: none;
+}
+
+/* Backend Service Notice Card */
+.preview-backend-card {
+    max-width: 520px;
+    margin: 40px auto;
+    background: #141416;
+    border: 1px solid #27272a;
+    border-radius: 12px;
+    padding: 28px;
+    text-align: center;
+    color: #e4e4e7;
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.5);
+}
+
+.preview-backend-card .backend-icon {
+    font-size: 38px;
+    margin-bottom: 12px;
+}
+
+.preview-backend-card h3 {
+    margin: 0 0 10px;
+    font-size: 17px;
+    color: #f8fafc;
+}
+
+.preview-backend-card p {
+    font-size: 13px;
+    line-height: 1.6;
+    color: #a1a1aa;
+    margin-bottom: 20px;
+}
+
+.preview-backend-card .backend-actions {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+}
+
+/* Image Preview Pane */
+.preview-image-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    min-height: 280px;
+    gap: 12px;
+    padding: 20px;
+}
+
+.preview-image-container img {
+    max-width: 90%;
+    max-height: 80vh;
+    border-radius: 8px;
+    border: 1px solid #27272a;
+    background: repeating-conic-gradient(#18181b 0% 25%, #202024 0% 50%) 50% / 16px 16px;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+}
+
+.preview-image-meta {
+    font-size: 11px;
+    color: #71717a;
+    font-family: ui-monospace, monospace;
+}
+
 .editor-footer {
     display: flex;
     align-items: center;

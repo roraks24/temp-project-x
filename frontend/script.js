@@ -250,8 +250,24 @@
     var activeFileName = document.getElementById("activeFileName");
     var fileDirtyIndicator = document.getElementById("fileDirtyIndicator");
     var btnTogglePreview = document.getElementById("btnTogglePreview");
+    var btnModeCode = document.getElementById("btnModeCode");
+    var btnModePreview = document.getElementById("btnModePreview");
     var btnSaveFile = document.getElementById("btnSaveFile");
     var agentCodeEditor = document.getElementById("agentCodeEditor");
+    var workspacePreviewContainer = document.getElementById("workspacePreviewContainer");
+    var previewToolbar = document.getElementById("previewToolbar");
+    var previewStatusDot = document.getElementById("previewStatusDot");
+    var previewAddressText = document.getElementById("previewAddressText");
+    var btnViewportDesktop = document.getElementById("btnViewportDesktop");
+    var btnViewportTablet = document.getElementById("btnViewportTablet");
+    var btnViewportMobile = document.getElementById("btnViewportMobile");
+    var btnRefreshPreview = document.getElementById("btnRefreshPreview");
+    var btnPopoutPreview = document.getElementById("btnPopoutPreview");
+    var btnExpandPreview = document.getElementById("btnExpandPreview");
+    var previewViewportWrapper = document.getElementById("previewViewportWrapper");
+    var previewViewportFrame = document.getElementById("previewViewportFrame");
+    var workspacePreviewIframe = document.getElementById("workspacePreviewIframe");
+    var previewDimensionBadge = document.getElementById("previewDimensionBadge");
     var artifactPreviewPane = document.getElementById("artifactPreviewPane");
     var editorStatusText = document.getElementById("editorStatusText");
     var editorCursorPosition = document.getElementById("editorCursorPosition");
@@ -899,6 +915,46 @@
         if (btnTogglePreview) {
             btnTogglePreview.addEventListener("click", function () {
                 toggleFilePreview();
+            });
+        }
+        if (btnModeCode) {
+            btnModeCode.addEventListener("click", function () {
+                setEditorMode("code");
+            });
+        }
+        if (btnModePreview) {
+            btnModePreview.addEventListener("click", function () {
+                setEditorMode("preview");
+            });
+        }
+        if (btnViewportDesktop) {
+            btnViewportDesktop.addEventListener("click", function () {
+                setPreviewViewport("desktop");
+            });
+        }
+        if (btnViewportTablet) {
+            btnViewportTablet.addEventListener("click", function () {
+                setPreviewViewport("tablet");
+            });
+        }
+        if (btnViewportMobile) {
+            btnViewportMobile.addEventListener("click", function () {
+                setPreviewViewport("mobile");
+            });
+        }
+        if (btnRefreshPreview) {
+            btnRefreshPreview.addEventListener("click", function () {
+                refreshPreviewIframe(true);
+            });
+        }
+        if (btnPopoutPreview) {
+            btnPopoutPreview.addEventListener("click", function () {
+                popoutPreview();
+            });
+        }
+        if (btnExpandPreview) {
+            btnExpandPreview.addEventListener("click", function () {
+                toggleExpandPreview();
             });
         }
         if (btnClearLogs) {
@@ -3219,7 +3275,7 @@
             .then(function () {
                 fileIsDirty = false;
                 if (fileDirtyIndicator) fileDirtyIndicator.style.display = "none";
-                if (isPreviewActive) renderFilePreview();
+                if (isPreviewActive) renderFilePreview(true);
                 showNotification("File saved successfully.");
             })
             .catch(function (err) {
@@ -3227,57 +3283,271 @@
             });
     }
 
-    function toggleFilePreview() {
-        isPreviewActive = !isPreviewActive;
-        if (isPreviewActive) {
+    var currentPreviewViewport = "desktop";
+    var isPreviewExpanded = false;
+
+    function setEditorMode(mode) {
+        if (mode === "preview") {
+            isPreviewActive = true;
+            if (btnModeCode) btnModeCode.classList.remove("active");
+            if (btnModePreview) btnModePreview.classList.add("active");
+            if (btnTogglePreview) btnTogglePreview.textContent = "Code";
             if (agentCodeEditor) agentCodeEditor.style.display = "none";
+            if (workspacePreviewContainer) workspacePreviewContainer.style.display = "flex";
+            renderFilePreview(false);
+        } else {
+            isPreviewActive = false;
+            if (btnModePreview) btnModePreview.classList.remove("active");
+            if (btnModeCode) btnModeCode.classList.add("active");
+            if (btnTogglePreview) btnTogglePreview.textContent = "Preview";
+            if (workspacePreviewContainer) workspacePreviewContainer.style.display = "none";
+            if (agentCodeEditor) {
+                agentCodeEditor.style.display = "block";
+                agentCodeEditor.focus();
+            }
+        }
+    }
+
+    function toggleFilePreview() {
+        setEditorMode(isPreviewActive ? "code" : "preview");
+    }
+
+    function setPreviewViewport(viewport) {
+        currentPreviewViewport = viewport;
+        var btnMap = {
+            desktop: btnViewportDesktop,
+            tablet: btnViewportTablet,
+            mobile: btnViewportMobile
+        };
+        Object.keys(btnMap).forEach(function (key) {
+            if (btnMap[key]) {
+                if (key === viewport) {
+                    btnMap[key].classList.add("active");
+                } else {
+                    btnMap[key].classList.remove("active");
+                }
+            }
+        });
+        if (previewViewportFrame) {
+            previewViewportFrame.className = "preview-viewport-frame " + viewport;
+        }
+        if (previewDimensionBadge) {
+            var labels = {
+                desktop: "Desktop (100%)",
+                tablet: "Tablet (768px)",
+                mobile: "Mobile (375x667px)"
+            };
+            previewDimensionBadge.textContent = labels[viewport] || viewport;
+        }
+    }
+
+    function toggleExpandPreview() {
+        var workspaceBody = document.querySelector(".agent-workspace-body");
+        if (!workspaceBody) return;
+        isPreviewExpanded = !isPreviewExpanded;
+        if (isPreviewExpanded) {
+            workspaceBody.classList.add("preview-expanded");
+            if (btnExpandPreview) btnExpandPreview.title = "Collapse Preview Pane";
+        } else {
+            workspaceBody.classList.remove("preview-expanded");
+            if (btnExpandPreview) btnExpandPreview.title = "Expand Preview Pane";
+        }
+    }
+
+    function getPreviewUrl(subpath, forceReload) {
+        if (!currentProject || !currentProject.workspace_id) return "";
+        var cleanSub = (subpath || "").replace(/^\/+/, "");
+        var url = API_BASE + "/api/agent/workspaces/" + encodeURIComponent(currentProject.workspace_id) + "/preview";
+        if (cleanSub) url += "/" + encodeURI(cleanSub);
+        var params = [];
+        var token = getAccessToken();
+        if (token) params.push("token=" + encodeURIComponent(token));
+        if (forceReload) params.push("_t=" + Date.now());
+        if (params.length > 0) url += "?" + params.join("&");
+        return url;
+    }
+
+    function loadPreviewIframe(subpath, forceReload) {
+        if (!workspacePreviewIframe) return;
+        var url = getPreviewUrl(subpath, forceReload);
+        if (!url) return;
+
+        if (previewStatusDot) {
+            previewStatusDot.classList.add("loading");
+        }
+        workspacePreviewIframe.onload = function () {
+            if (previewStatusDot) {
+                previewStatusDot.classList.remove("loading");
+            }
+        };
+        workspacePreviewIframe.onerror = function () {
+            if (previewStatusDot) {
+                previewStatusDot.classList.remove("loading");
+            }
+        };
+
+        if (workspacePreviewIframe.src !== url) {
+            workspacePreviewIframe.src = url;
+        }
+    }
+
+    function refreshPreviewIframe(forceReload) {
+        if (btnRefreshPreview) {
+            btnRefreshPreview.classList.add("spinning");
+            setTimeout(function () {
+                if (btnRefreshPreview) btnRefreshPreview.classList.remove("spinning");
+            }, 600);
+        }
+        renderFilePreview(forceReload !== false);
+    }
+
+    function popoutPreview() {
+        var hasIndex = (currentWorkspaceTree || []).some(function (n) {
+            return n.name === "index.html" || n.path === "index.html";
+        });
+        var ext = (activeFilePath || "").split(".").pop().toLowerCase();
+        var targetPath = (ext === "html" || ext === "htm") ? activeFilePath : (hasIndex ? "index.html" : (activeFilePath || ""));
+        var url = getPreviewUrl(targetPath, false);
+        if (url) {
+            window.open(url, "_blank");
+        }
+    }
+
+    function renderFilePreview(forceReload) {
+        if (!agentCodeEditor) return;
+        var content = agentCodeEditor.value || "";
+        var ext = (activeFilePath || "").split(".").pop().toLowerCase();
+        var hasIndexHtml = (currentWorkspaceTree || []).some(function (n) {
+            return n.name === "index.html" || n.path === "index.html";
+        });
+
+        // 1. Static Web Application (HTML or CSS/JS when index.html exists)
+        if (ext === "html" || ext === "htm" || ((ext === "css" || ext === "js") && hasIndexHtml) || (!activeFilePath && hasIndexHtml)) {
+            if (previewViewportFrame) previewViewportFrame.style.display = "flex";
+            if (artifactPreviewPane) artifactPreviewPane.style.display = "none";
+            var targetSub = (ext === "html" || ext === "htm") ? activeFilePath : "index.html";
+            if (previewAddressText) {
+                previewAddressText.textContent = "/" + targetSub + ((ext === "css" || ext === "js") ? " (" + activeFilePath + ")" : "");
+            }
+            loadPreviewIframe(targetSub, forceReload);
+            return;
+        }
+
+        // 2. Markdown Viewer
+        if (ext === "md" || ext === "markdown") {
+            if (previewViewportFrame) previewViewportFrame.style.display = "none";
             if (artifactPreviewPane) {
                 artifactPreviewPane.style.display = "block";
-                renderFilePreview();
+                if (previewAddressText) previewAddressText.textContent = "/" + (activeFilePath || "Document.md");
+                if (window.marked && window.DOMPurify) {
+                    artifactPreviewPane.innerHTML = window.DOMPurify.sanitize(window.marked.parse(content));
+                } else {
+                    artifactPreviewPane.textContent = content;
+                }
             }
-            if (btnTogglePreview) btnTogglePreview.textContent = "Code";
-        } else {
-            if (artifactPreviewPane) artifactPreviewPane.style.display = "none";
-            if (agentCodeEditor) agentCodeEditor.style.display = "block";
-            if (btnTogglePreview) btnTogglePreview.textContent = "Preview";
+            return;
         }
-    }
 
-    function renderFilePreview() {
-        if (!artifactPreviewPane || !agentCodeEditor) return;
-        var content = agentCodeEditor.value;
-        var ext = (activeFilePath || "").split(".").pop().toLowerCase();
-
-        if (ext === "md" || ext === "markdown") {
-            if (window.marked && window.DOMPurify) {
-                artifactPreviewPane.innerHTML = window.DOMPurify.sanitize(window.marked.parse(content));
-            } else {
-                artifactPreviewPane.textContent = content;
+        // 3. JSON Viewer
+        if (ext === "json") {
+            if (previewViewportFrame) previewViewportFrame.style.display = "none";
+            if (artifactPreviewPane) {
+                artifactPreviewPane.style.display = "block";
+                if (previewAddressText) previewAddressText.textContent = "/" + (activeFilePath || "data.json");
+                try {
+                    var parsed = JSON.parse(content);
+                    artifactPreviewPane.innerHTML = "<div style='padding: 8px;'><pre style='background:#121214;padding:16px;border-radius:8px;border:1px solid #27272a;overflow:auto;'><code style='color:#38bdf8;font-size:12px;font-family:ui-monospace,monospace;'>" + escapeHtml(JSON.stringify(parsed, null, 2)) + "</code></pre></div>";
+                } catch (e) {
+                    artifactPreviewPane.innerHTML = "<pre><code>" + escapeHtml(content) + "</code></pre>";
+                }
             }
-        } else if (ext === "json") {
-            try {
-                var parsed = JSON.parse(content);
-                artifactPreviewPane.innerHTML = "<pre><code>" + escapeHtml(JSON.stringify(parsed, null, 2)) + "</code></pre>";
-            } catch (e) {
+            return;
+        }
+
+        // 4. CSV Viewer
+        if (ext === "csv") {
+            if (previewViewportFrame) previewViewportFrame.style.display = "none";
+            if (artifactPreviewPane) {
+                artifactPreviewPane.style.display = "block";
+                if (previewAddressText) previewAddressText.textContent = "/" + (activeFilePath || "data.csv");
+                var rows = content.trim().split("\n");
+                var tableHtml = "<div style='overflow-x:auto;padding:8px;'><table class='preview-csv-table'>";
+                rows.forEach(function (row, idx) {
+                    var cols = row.split(",");
+                    tableHtml += "<tr>";
+                    cols.forEach(function (col) {
+                        tableHtml += idx === 0 ? "<th>" + escapeHtml(col.trim()) + "</th>" : "<td>" + escapeHtml(col.trim()) + "</td>";
+                    });
+                    tableHtml += "</tr>";
+                });
+                tableHtml += "</table></div>";
+                artifactPreviewPane.innerHTML = tableHtml;
+            }
+            return;
+        }
+
+        // 5. Image Viewer
+        if (["png", "jpg", "jpeg", "gif", "svg", "webp", "ico"].indexOf(ext) !== -1) {
+            if (previewViewportFrame) previewViewportFrame.style.display = "none";
+            if (artifactPreviewPane) {
+                artifactPreviewPane.style.display = "block";
+                if (previewAddressText) previewAddressText.textContent = "/" + activeFilePath;
+                var imgUrl = getPreviewUrl(activeFilePath, forceReload);
+                artifactPreviewPane.innerHTML = '<div class="preview-image-container"><img src="' + imgUrl + '" alt="' + escapeHtml(activeFilePath) + '" /><div class="preview-image-meta">' + escapeHtml(activeFilePath) + '</div></div>';
+            }
+            return;
+        }
+
+        // 6. Backend Service Notice
+        if (["py", "sh", "dockerfile"].indexOf(ext) !== -1 || (activeFilePath && activeFilePath.toLowerCase().indexOf("requirements") !== -1)) {
+            if (hasIndexHtml) {
+                if (previewViewportFrame) previewViewportFrame.style.display = "flex";
+                if (artifactPreviewPane) artifactPreviewPane.style.display = "none";
+                if (previewAddressText) previewAddressText.textContent = "/index.html";
+                loadPreviewIframe("index.html", forceReload);
+            } else {
+                if (previewViewportFrame) previewViewportFrame.style.display = "none";
+                if (artifactPreviewPane) {
+                    artifactPreviewPane.style.display = "block";
+                    if (previewAddressText) previewAddressText.textContent = "/" + activeFilePath;
+                    artifactPreviewPane.innerHTML = '<div class="preview-backend-card">' +
+                        '<div class="backend-icon">⚡</div>' +
+                        '<h3>Backend Service Detected</h3>' +
+                        '<p>This project contains executable server-side code (<strong>' + escapeHtml(activeFilePath) + '</strong>). Agent Co produces complete source code ready to run locally, in Docker, or deploy to cloud hosting.</p>' +
+                        '<div class="backend-actions">' +
+                        '<button type="button" class="btn-xs btn-primary" id="btnPreviewDownloadZip">Download Project ZIP</button>' +
+                        '<button type="button" class="btn-xs btn-secondary" id="btnPreviewInspectCode">Inspect Source Code</button>' +
+                        '</div></div>';
+                    var btnDl = document.getElementById("btnPreviewDownloadZip");
+                    if (btnDl) btnDl.addEventListener("click", downloadWorkspaceZip);
+                    var btnCd = document.getElementById("btnPreviewInspectCode");
+                    if (btnCd) btnCd.addEventListener("click", function () { setEditorMode("code"); });
+                }
+            }
+            return;
+        }
+
+        // 7. Fallback Code / Text
+        if (hasIndexHtml) {
+            if (previewViewportFrame) previewViewportFrame.style.display = "flex";
+            if (artifactPreviewPane) artifactPreviewPane.style.display = "none";
+            if (previewAddressText) previewAddressText.textContent = "/index.html";
+            loadPreviewIframe("index.html", forceReload);
+        } else {
+            if (previewViewportFrame) previewViewportFrame.style.display = "none";
+            if (artifactPreviewPane) {
+                artifactPreviewPane.style.display = "block";
+                if (previewAddressText) previewAddressText.textContent = "/" + (activeFilePath || "Output");
                 artifactPreviewPane.innerHTML = "<pre><code>" + escapeHtml(content) + "</code></pre>";
             }
-        } else if (ext === "csv") {
-            var rows = content.trim().split("\n");
-            var tableHtml = "<table>";
-            rows.forEach(function (row, idx) {
-                var cols = row.split(",");
-                tableHtml += "<tr>";
-                cols.forEach(function (col) {
-                    tableHtml += idx === 0 ? "<th>" + escapeHtml(col.trim()) + "</th>" : "<td>" + escapeHtml(col.trim()) + "</td>";
-                });
-                tableHtml += "</tr>";
-            });
-            tableHtml += "</table>";
-            artifactPreviewPane.innerHTML = tableHtml;
-        } else {
-            artifactPreviewPane.innerHTML = "<pre><code>" + escapeHtml(content) + "</code></pre>";
         }
     }
+
+    // Expose helpers globally for testing and inline interactions
+    window.setEditorMode = setEditorMode;
+    window.downloadWorkspaceZip = downloadWorkspaceZip;
+    window.renderFilePreview = renderFilePreview;
+    window.setPreviewViewport = setPreviewViewport;
 
     // Modal: New File
     function openNewFileModal() {
@@ -3654,7 +3924,7 @@
                 }
             }
 
-            // Refresh tree to show generated files and open primary report
+            // Refresh tree to show generated files and open primary preview
             loadWorkspaceTree();
             setTimeout(function () {
                 var candidate = currentWorkspaceTree.find(function (n) {
@@ -3662,9 +3932,13 @@
                 });
                 if (candidate) {
                     openFileInEditor(candidate.path);
-                    if (candidate.name.endsWith(".md") && !isPreviewActive) {
-                        toggleFilePreview();
+                    if ((candidate.name === "index.html" || candidate.name.endsWith(".md")) && !isPreviewActive) {
+                        setEditorMode("preview");
+                    } else if (isPreviewActive) {
+                        renderFilePreview(true);
                     }
+                } else if (isPreviewActive) {
+                    renderFilePreview(true);
                 }
             }, 600);
         } else if (evtName === "run_error") {

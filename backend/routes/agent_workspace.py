@@ -5,14 +5,16 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import mimetypes
 import re
 from datetime import datetime, timezone
+from pathlib import Path
 from time import perf_counter
 from typing import Any, AsyncIterator, Optional
 from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
-from fastapi.responses import JSONResponse, Response, StreamingResponse
+from fastapi.responses import FileResponse, JSONResponse, Response, StreamingResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
@@ -21,6 +23,7 @@ from backend.agent.llm import build_chat_model
 from backend.agent.prompts import get_prompt_schema
 from backend.agent.tools_registry import GLOBAL_TOOL_REGISTRY
 from backend.agent.workspace_service import (
+    WorkspaceValidationError,
     create_zip_archive,
     delete_file,
     get_workspace_dir,
@@ -33,6 +36,7 @@ from backend.agent.workspace_service import (
 )
 from backend.core.auth import get_current_user, get_optional_current_user
 from backend.core.database import get_db
+from backend.core.security import decode_access_token
 from backend.models.db import (
     AgentRun,
     ExecutionAction,
@@ -119,11 +123,23 @@ def _get_project_with_ownership(
 
 
 def _get_workspace_with_ownership(
-    workspace_id: UUID,
+    workspace_id: UUID | str,
     db: Session,
     current_user: Optional[User],
 ) -> Workspace:
-    workspace = db.query(Workspace).filter(Workspace.id == workspace_id).first()
+    ws_uuid = None
+    if isinstance(workspace_id, UUID):
+        ws_uuid = workspace_id
+    else:
+        try:
+            ws_uuid = UUID(str(workspace_id))
+        except (ValueError, AttributeError):
+            ws_uuid = None
+
+    workspace = None
+    if ws_uuid:
+        workspace = db.query(Workspace).filter(Workspace.id == ws_uuid).first()
+
     if not workspace:
         # Check if directory exists on disk for default/demo workspace
         ws_path = get_workspace_dir(str(workspace_id))
@@ -138,7 +154,7 @@ def _get_workspace_with_ownership(
             db.add(dummy_proj)
             db.flush()
             workspace = Workspace(
-                id=workspace_id,
+                id=ws_uuid or uuid4(),
                 project_id=dummy_proj.id,
                 user_id=user_id,
                 storage_path=str(ws_path),
@@ -400,6 +416,174 @@ def download_workspace_zip(
         media_type="application/zip",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 2.1 Workspace Live Preview Endpoint
+# ─────────────────────────────────────────────────────────────────────────────
+
+PREVIEW_MIME_TYPES: dict[str, str] = {
+    ".html": "text/html; charset=utf-8",
+    ".htm": "text/html; charset=utf-8",
+    ".css": "text/css; charset=utf-8",
+    ".js": "application/javascript; charset=utf-8",
+    ".mjs": "application/javascript; charset=utf-8",
+    ".json": "application/json; charset=utf-8",
+    ".svg": "image/svg+xml",
+    ".png": "image/png",
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".gif": "image/gif",
+    ".webp": "image/webp",
+    ".ico": "image/x-icon",
+    ".woff": "font/woff",
+    ".woff2": "font/woff2",
+    ".ttf": "font/ttf",
+    ".otf": "font/otf",
+    ".md": "text/markdown; charset=utf-8",
+    ".txt": "text/plain; charset=utf-8",
+}
+
+
+def _get_preview_mime_type(file_path: Path) -> str:
+    ext = file_path.suffix.lower()
+    if ext in PREVIEW_MIME_TYPES:
+        return PREVIEW_MIME_TYPES[ext]
+    guessed, _ = mimetypes.guess_type(file_path.name)
+    return guessed or "application/octet-stream"
+
+
+@router.get("/workspaces/{workspace_id}/preview")
+@router.get("/workspaces/{workspace_id}/preview/{subpath:path}")
+def preview_workspace_file(
+    workspace_id: str,
+    subpath: str = "",
+    token: Optional[str] = Query(None),
+    db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_optional_current_user),
+):
+    """
+    Securely serve static web preview files and assets directly from workspace storage.
+    Enforces project ownership, strict path traversal checks, and correct MIME types.
+    """
+    # 1. Resolve authentication either from Bearer header or query token parameter
+    resolved_user = current_user
+    if not resolved_user and token:
+        try:
+            payload = decode_access_token(token)
+            user_id_str = payload.get("sub")
+            if user_id_str:
+                resolved_user = db.query(User).filter(User.id == UUID(str(user_id_str))).first()
+        except Exception as exc:
+            logger.debug("Preview token verification error: %s", exc)
+
+    # 2. Enforce workspace ownership
+    _get_workspace_with_ownership(workspace_id, db, resolved_user)
+
+    # 3. Clean and resolve safe subpath
+    clean_subpath = subpath.strip().replace("\\", "/").lstrip("/")
+    if not clean_subpath:
+        clean_subpath = "index.html"
+
+    try:
+        target = resolve_safe_path(clean_subpath, str(workspace_id))
+    except WorkspaceValidationError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Path traversal forbidden: {exc}",
+        )
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        )
+
+    # 4. If directory was requested, look for index.html inside it
+    if target.is_dir():
+        candidate_index = target / "index.html"
+        if candidate_index.is_file():
+            target = candidate_index
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Directory index not found for path '{clean_subpath}'",
+            )
+
+    # 5. Handle missing file
+    if not target.exists():
+        if clean_subpath.lower() in ("index.html", "index.htm"):
+            empty_html = """<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Workspace Live Preview</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #09090b;
+      color: #94a3b8;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      margin: 0;
+      padding: 20px;
+      box-sizing: border-box;
+    }
+    .preview-card {
+      text-align: center;
+      max-width: 460px;
+      padding: 36px 28px;
+      background: #141416;
+      border: 1px solid #27272a;
+      border-radius: 12px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+    }
+    .icon { font-size: 40px; margin-bottom: 12px; }
+    h2 { color: #f8fafc; font-size: 19px; margin: 0 0 8px; font-weight: 600; }
+    p { font-size: 14px; line-height: 1.6; margin: 0 0 18px; color: #a1a1aa; }
+    .badge {
+      display: inline-block;
+      padding: 4px 12px;
+      background: #1e293b;
+      color: #60a5fa;
+      border: 1px solid #334155;
+      border-radius: 9999px;
+      font-size: 12px;
+      font-family: ui-monospace, monospace;
+    }
+  </style>
+</head>
+<body>
+  <div class="preview-card">
+    <div class="icon">🌐</div>
+    <h2>Live Preview Ready</h2>
+    <p>No <code>index.html</code> was found in this workspace yet. Execute a software generation objective (e.g., portfolio or web app) to see live interactive output here.</p>
+    <span class="badge">Awaiting index.html</span>
+  </div>
+</body>
+</html>"""
+            return Response(
+                content=empty_html,
+                status_code=status.HTTP_200_OK,
+                media_type="text/html",
+                headers={"Content-Type": "text/html; charset=utf-8"},
+            )
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Resource '{clean_subpath}' not found in workspace.",
+        )
+
+    # 6. Stream asset with correct MIME type and secure sandbox headers
+    mime_type = _get_preview_mime_type(target)
+    headers = {
+        "Content-Type": mime_type,
+        "Cache-Control": "no-cache, no-store, must-revalidate",
+        "Content-Security-Policy": "frame-ancestors *; default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob: https:;",
+        "X-Content-Type-Options": "nosniff",
+    }
+    return FileResponse(path=str(target), media_type=mime_type, headers=headers)
+
 
 
 # ─────────────────────────────────────────────────────────────────────────────
